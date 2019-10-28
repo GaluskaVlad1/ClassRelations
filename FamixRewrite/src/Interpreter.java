@@ -251,6 +251,7 @@ class Interpreter {
 				FamixClass c=getClassByID(ID);
 				if(c!=null) {
 					c.setFile(f);
+					f.addClass(c);
 				}
 			}
 		}
@@ -330,15 +331,20 @@ class Interpreter {
 			FamixClass c=it.next();
 			c.set();
 		}
+		Iterator<ContainingFile> itf=Files.iterator();
+		while(itf.hasNext()){
+			ContainingFile f=itf.next();
+			f.setEverything();
+		}
 		
 	}
 	
 	public String toString() {
 		String st="";
-		Iterator<FamixClass> it=Classes.iterator();
+		Iterator<ContainingFile> it=Files.iterator();
 		while(it.hasNext()) {
-			FamixClass c=it.next();
-			st=st+c;
+			ContainingFile f=it.next();
+			st=st+f;
 		}
 		return st;
 	}

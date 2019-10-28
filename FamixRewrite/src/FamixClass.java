@@ -12,6 +12,7 @@ class FamixClass {
 	private ArrayList<Method> ContainedMethods=new ArrayList<Method> ();
 	private ArrayList<Attribute> ContainedAttributes=new ArrayList<Attribute> ();
 	private ArrayList<FamixClass> InheritedClasses=new ArrayList<FamixClass> ();
+	private Map<FamixClass,Method> OverrideClassAndMethod=new HashMap<FamixClass,Method>();
 	private Map<FamixClass,Integer> InheritanceRelations=new HashMap<FamixClass,Integer> ();
 	private Set<Method> CalledMethods=new HashSet<Method>();
 	private Set<Attribute> AccessedAttributes=new HashSet<Attribute> ();
@@ -20,13 +21,31 @@ class FamixClass {
 	private Map<FamixClass,Integer> Calls=new HashMap<FamixClass,Integer> ();
 	private Map<FamixClass,Integer> Accesses=new HashMap<FamixClass,Integer> ();
 	private Map<FamixClass,Triplet> ClassesRelations=new HashMap<FamixClass,Triplet> ();
+	private Map<FamixClass,ArrayList<Method>> OverrideRelations=new HashMap<FamixClass,ArrayList<Method>> ();
 	private ContainingFile File;
+	private boolean isFromJava=true;
 	private boolean Interface;
 
 	public FamixClass(boolean Interface, long ID, String Name) {
 		this.ID=ID;
 		this.Name=Name;
 		this.Interface=Interface;
+	}
+
+	public Set<Method> getCalledMethods(){
+		return CalledMethods;
+	}
+
+	public Set<Attribute> getProtectedAccessedAttributes(){
+		return ProtectedAccessedAttributes;
+	}
+
+	public Set<Method> getCalledProtectedMethods(){
+		return ProtectedCalledMethods;
+	}
+
+	public Set<Attribute> getAccessedAttributes(){
+		return AccessedAttributes;
 	}
 
 	public void addMethod(Method m) {
@@ -45,10 +64,22 @@ class FamixClass {
 			if(c!=null) {
 				OverrideOrSpecializeMethods.add(m);
 				addClassToMap(InheritanceRelations,c,2);
+				if(OverrideRelations.containsKey(c)){
+					OverrideRelations.get(c).add(m);
+				}
+				else{
+					ArrayList<Method> adder=new ArrayList<Method>();
+					adder.add(m);
+					OverrideRelations.put(c,adder);
+				}
 			}
 		}
 		setInherits();
 		
+	}
+
+	public Map<FamixClass,ArrayList<Method>> getOverrideRelations(){
+		return OverrideRelations;
 	}
 
 	private void setInherits() {
@@ -95,12 +126,17 @@ class FamixClass {
 	}
 
 	public void setFile(ContainingFile f) {
+		if(f!=null) isFromJava=false;
 		File=f;
 		Name=f.getFileName()+"/"+Name;
 	}
 
 	public void addInheritedClass(FamixClass c) {
 		InheritedClasses.add(c);
+	}
+
+	public ArrayList<FamixClass> getInheritedClasses(){
+		return InheritedClasses;
 	}
 
 	public boolean equals(Object o) {
@@ -129,11 +165,6 @@ class FamixClass {
 			Set<Attribute> PCA=m.getProtectedAttributesAccessed();
 			if(PCA!=null) ProtectedAccessedAttributes.addAll(PCA);
 		}
-		setMapForCall();
-		setMapForAccess();
-		setMapForCalledProtectedMethods();
-		setMapForAccessedProtectedAttributes();
-		setTriplets();
 	}
 
 	private void setMapForAccessedProtectedAttributes() {
@@ -211,6 +242,14 @@ class FamixClass {
 		}
 	}
 
+	public ContainingFile getContainingFile(){
+		return File;
+	}
+
+	public boolean checkIfIsFromJava(){
+		return isFromJava;
+	}
+
 	private void addClassToMap(Map<FamixClass,Integer> m, FamixClass c, int startValue) {
 		if(m.containsKey(c)) {
 			m.put(c,m.get(c)+1);
@@ -226,8 +265,11 @@ class FamixClass {
 		for(Map.Entry<FamixClass,Triplet> entry:ClassesRelations.entrySet()) {
 			FamixClass c=entry.getKey();
 			Triplet t=entry.getValue();
-			if(c!=null)  st=st+Name+","+c.getName()+","+t+"\n";
-			else st=st+Name+",ImportedCalls,"+t+"\n";
+			if(!this.equals(c)) {
+				if (c != null) {
+					 if(!c.checkIfIsFromJava() && !this.checkIfIsFromJava())st = st + Name + "," + c.getName() + "," + t + "\n";
+				}
+			}
 		}
 		return st;
 	}
