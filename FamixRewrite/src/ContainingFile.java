@@ -131,6 +131,10 @@ class ContainingFile {
 		}
 	}
 
+	public void setFileName(String name){
+		FileName=name;
+	}
+
 	private void setAccessedProtectedAttributeRelations(){
 		Iterator<Attribute> it=AccessedProtectedAttributes.iterator();
 		while(it.hasNext()){

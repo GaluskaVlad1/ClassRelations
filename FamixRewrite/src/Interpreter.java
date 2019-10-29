@@ -338,9 +338,12 @@ class Interpreter {
 		}
 		
 	}
-	
+
+	public ArrayList<ContainingFile> getFiles(){
+		return Files;
+	}
 	public String toString() {
-		String st="";
+		String st="source,target,extCalls,extData,hierarchy\n";
 		Iterator<ContainingFile> it=Files.iterator();
 		while(it.hasNext()) {
 			ContainingFile f=it.next();
