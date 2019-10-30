@@ -8,17 +8,22 @@ class Method {
 	private FamixClass ParentClass;
 	private String signature;
 	private String modifiers;
+	private int cyclomaticComplexity;
 	private Set<Method> CalledMethods=new HashSet<Method> ();
 	private Set<Attribute> AccessedAttributes=new HashSet<Attribute> ();
 	private Set<Method> ProtectedMethods=new HashSet<Method> ();
 	private Set<Attribute> ProtectedAttributes=new HashSet<Attribute> ();
-	public Method(long ID,long parentType,String signature,String modifiers,String kind) {
+	public Method(long ID,long parentType,String signature,String modifiers,String kind,int cyclomaticComplexity) {
 		this.kind=kind;
 		this.parentType=parentType;
 		this.ID=ID;
 		this.signature=signature;
 		this.modifiers=modifiers;
+		this.cyclomaticComplexity=cyclomaticComplexity;
 	}
+	public int getCyclomaticComplexity(){
+	    return cyclomaticComplexity;
+    }
 	public Set<Method> getCalledMethods(){
 		return CalledMethods;
 	}

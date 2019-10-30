@@ -147,6 +147,30 @@ class FamixClass {
 		return false;
 	}
 
+	public double getAMW(){
+	    return ContainedMethods.stream()
+				.filter(m -> m.getCyclomaticComplexity()!=0)
+                .mapToInt(Method::getCyclomaticComplexity)
+                .average()
+                .orElse(0);
+    }
+
+	public Double round(Double d){
+		return ((double) ((int) (d*100)))/100;
+	}
+
+    public double getWMC(){
+		return ContainedMethods.stream()
+				.mapToInt(Method::getCyclomaticComplexity)
+				.sum();
+	}
+
+	public String getMetrics(){
+		String st="";
+		st=st+round(getAMW())+","+getWMC();
+		return st;
+	}
+
 	public boolean isMethodInherited(Method m) {
 		if(OverrideOrSpecializeMethods.contains(m)) return true;
 		return false;

@@ -46,14 +46,16 @@ class Interpreter {
 		String signature="";
 		String modifiers="";
 		String kind="";
+		int cyclomaticComplexity=0;
 		while(st!=null && !st.contains("FAMIX.")) {
 			if(st.contains("kind")) kind=getName(st.toCharArray());
 			if(st.contains("modifiers ")) modifiers=getModifiers(st.toCharArray());
 			if(st.contains("parentType")) parentType=getID(st.toCharArray());
 			if(st.contains("signature"))signature=getName(st.toCharArray());
+			if(st.contains("cyclomaticComplexity"))cyclomaticComplexity=(int)getID(st.toCharArray());
 			st=r.getNextLine();
 		}
-		Method m=new Method(MethodID,parentType,signature,modifiers,kind);
+		Method m=new Method(MethodID,parentType,signature,modifiers,kind,cyclomaticComplexity);
 		Methods.add(m);
 		if(st.contains("FAMIX.")) checkForType(st);
 	}
@@ -342,6 +344,19 @@ class Interpreter {
 	public ArrayList<ContainingFile> getFiles(){
 		return Files;
 	}
+
+	public String getClassMetrics(){
+        String st="file,class,AMW,WMC\n";
+        Iterator<FamixClass> it=Classes.iterator();
+        while(it.hasNext()){
+        	FamixClass c=it.next();
+        	if(c.getContainingFile()!=null){
+        		st=st+c.getContainingFile().getFileName()+","+c.getName()+","+c.getMetrics()+"\n";
+			}
+		}
+        return st;
+    }
+
 	public String toString() {
 		String st="source,target,extCalls,extData,hierarchy\n";
 		Iterator<ContainingFile> it=Files.iterator();

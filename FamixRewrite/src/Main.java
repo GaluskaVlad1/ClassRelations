@@ -3,8 +3,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.PrintWriter;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -57,12 +55,27 @@ public class Main{
 		}
 	}
 
-	static String outputFileName(String args) {
+	static String outputRelationsName(String args) {
 		String st="";
 		st=args.replace(".mse", "-relations.csv");
 		st=st.replace(".MSE", "-relations.csv");
 		return st;
 	}
+
+    static String outputMetricsName(String fileName){
+	    String st="";
+	    st=fileName.replace(".mse","-metrics.csv");
+	    st=st.replace(".mse","-metrics.csv");
+	    return st;
+    }
+
+    static void beginMetricsComputation(Interpreter i,String fileName) throws Exception{
+        FileWriter ClassMetricsWriter=new FileWriter(outputMetricsName(fileName));
+        PrintWriter ClassMetricsPrinter=new PrintWriter(ClassMetricsWriter);
+        ClassMetricsPrinter.print(i.getClassMetrics());
+        ClassMetricsPrinter.close();
+    }
+
 	public static void main(String[] args) throws Exception{
 		System.out.println();
 		File FileName=new File(args[0]);
@@ -85,13 +98,15 @@ public class Main{
 
 		String st=i.toString();
 		
-		FileWriter fileWriter=new FileWriter(outputFileName(args[0]));
+		FileWriter classRelationsWriter=new FileWriter(outputRelationsName(args[0]));
 		
-		PrintWriter printWriter=new PrintWriter(fileWriter);
+		PrintWriter classRelationsPrinter=new PrintWriter(classRelationsWriter);
 		
-		printWriter.print(st);
+		classRelationsPrinter.print(st);
 		
-		printWriter.close();
+		classRelationsPrinter.close();
+
+		beginMetricsComputation(i,args[0]);
 	}
 
 }
