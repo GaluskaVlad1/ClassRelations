@@ -159,16 +159,27 @@ class FamixClass {
 		return ((double) ((int) (d*100)))/100;
 	}
 
-    public double getWMC(){
+    public int getWMC(){
 		return ContainedMethods.stream()
 				.mapToInt(Method::getCyclomaticComplexity)
 				.sum();
 	}
 
+	public int getNOM(){
+		return ContainedMethods.size();
+	}
+
 	public String getMetrics(){
 		String st="";
-		st=st+round(getAMW())+","+getWMC();
+		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA();
 		return st;
+	}
+
+	public int getNOPA(){
+		return (int)ContainedAttributes.stream()
+				.filter(attribute -> attribute!=null)
+				.filter(Attribute::isPublic)
+				.count();
 	}
 
 	public boolean isMethodInherited(Method m) {

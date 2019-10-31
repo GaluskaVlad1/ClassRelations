@@ -57,7 +57,7 @@ class Interpreter {
 		}
 		Method m=new Method(MethodID,parentType,signature,modifiers,kind,cyclomaticComplexity);
 		Methods.add(m);
-		if(st.contains("FAMIX.")) checkForType(st);
+		checkForType(st);
 	}
 	
 	private String getModifiers(char[] chArray) {
@@ -113,13 +113,15 @@ class Interpreter {
 		long AttributeID=getID(st.toCharArray());
 		Attribute a=new Attribute(AttributeID);
 		st=r.getNextLine();
-		long type=0;
+		long type=0,parentType=0;
 		String modifiers="";
 		while(st!=null && !st.contains("FAMIX.")) {
 			if(st.contains("declaredType")) type=getID(st.toCharArray());
 			if(st.contains("modifiers")) modifiers=getModifiers(st.toCharArray());
+			if(st.contains("parentType")) parentType=getID(st.toCharArray());
 			st=r.getNextLine();
 		}
+		a.setContainerID(parentType);
 		a.setType(type);
 		a.setModifiers(modifiers);
 		Attributes.add(a);
@@ -161,7 +163,7 @@ class Interpreter {
 		if(st!=null && st.contains("isInterface")) Interface=true;
 		FamixClass c=new FamixClass(Interface,ClassID,ClassName);
 		Classes.add(c);
-		if(st!=null && st.contains("FAMIX")) checkForType(st);
+		checkForType(st);
 	}
 	
 	public String getName(char[] chArray) throws Exception{
@@ -317,12 +319,23 @@ class Interpreter {
 		}
 	}
 
+	private void setContainerToAttribute(){
+		Iterator<Attribute> it=Attributes.iterator();
+		while(it.hasNext()){
+			Attribute a=it.next();
+			FamixClass Container=getClassByID(a.getContainerID());
+			if(Container!=null) Container.addAttribute(a);
+			a.setContainer(Container);
+		}
+	}
+
 	public void initialize() {
 		setContainingFiles();
 		setClassesMethods();
 		setClassToAttribute();
 		setInheritanceRelations();
 		setInvocations();
+		setContainerToAttribute();
 		Iterator<FamixClass> it=Classes.iterator();
 		while(it.hasNext()) {
 			FamixClass c=it.next();
@@ -346,7 +359,7 @@ class Interpreter {
 	}
 
 	public String getClassMetrics(){
-        String st="file,class,AMW,WMC\n";
+        String st="file,class,AMW,WMC,NOM,NOPA\n";
         Iterator<FamixClass> it=Classes.iterator();
         while(it.hasNext()){
         	FamixClass c=it.next();
