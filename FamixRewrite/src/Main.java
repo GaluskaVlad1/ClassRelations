@@ -107,6 +107,7 @@ public class Main{
 		classRelationsPrinter.close();
 
 		beginMetricsComputation(i,args[0]);
+
 	}
 
 }

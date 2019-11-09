@@ -1,11 +1,14 @@
 import java.util.*;
 class Interpreter {
 	private ArrayList<FamixClass> Classes=new ArrayList<FamixClass> ();
+	private ArrayList<Access> Accesses=new ArrayList<Access>();
 	private ArrayList<Method> Methods=new ArrayList<Method> ();
 	private ArrayList<Attribute> Attributes=new ArrayList<Attribute> ();
 	private ArrayList<Invocation> Invocations=new ArrayList<Invocation> ();
 	private ArrayList<Inheritance> Inherits=new ArrayList<Inheritance> ();
 	private ArrayList<ContainingFile> Files=new ArrayList<ContainingFile> ();
+	private ArrayList<Parameter> Parameters=new ArrayList<Parameter> ();
+	private ArrayList<LocalVariable> LocalVariables=new ArrayList<LocalVariable>();
 	private Reader r;
 	public void setReader(Reader r) {
 		this.r=r;
@@ -13,7 +16,7 @@ class Interpreter {
 	
 	public void checkForType(String st) throws Exception{
 		if(st==null) return;
-		if(st.contains("(FAMIX.Class")||st.contains("FAMIX.PrimitiveType")||st.contains("FAMIX.Type")) {
+		if(st.contains("(FAMIX.Class")||st.contains("FAMIX.PrimitiveType")||st.contains("FAMIX.Type")||st.contains("FAMIX.ParameterizableClass")) {
 			interpretClass(st);
 			return;
 		}
@@ -33,12 +36,56 @@ class Interpreter {
 			interpretInheritance();
 			return;
 		}
-		if(st.contains("(FAMIX.Attribute")) {
+		if(st.contains("(FAMIX.Attribute")||st.contains("(FAMIX.LocalVariable ") || st.contains("FAMIX.Parameter ")) {
 			interpretAttribute(st);
 			return;
 		}
+		if(st.contains("(FAMIX.Access ")){
+			interpretAccess();
+			return;
+		}
 	}
-	
+
+	private void interpretAccess() throws Exception{
+		String st=r.getNextLine();
+		long variableID=0;
+		while(st!=null && !st.contains("(FAMIX.")){
+			if(st.contains("variable ")) variableID=getID(st.toCharArray());
+			st=r.getNextLine();
+		}
+		Access a=new Access(variableID);
+		Accesses.add(a);
+		checkForType(st);
+	}
+
+	private void interpretLocalVariable(String st) throws Exception{
+		long ID=getID(st.toCharArray());
+		long containerID=0,declaredID=0;
+		st=r.getNextLine();
+		while(st!=null && !st.contains("(FAMIX.")){
+			if(st.contains("(parentBehaviouralEntity ")) containerID=getID(st.toCharArray());
+			if(st.contains("(declaredType ")) declaredID=getID(st.toCharArray());
+			st=r.getNextLine();
+		}
+		LocalVariable lv=new LocalVariable(ID,containerID,declaredID);
+		LocalVariables.add(lv);
+		checkForType(st);
+	}
+
+	private void interpretParameter(String st)throws Exception{
+		long ID=getID(st.toCharArray());
+		st=r.getNextLine();
+		long declaredID=0,parentID=0;
+		while(st!=null && !st.contains("FAMIX")){
+			if(st.contains("(declaredType ")) declaredID=getID(st.toCharArray());
+			if(st.contains("(parentBehaviouralEntity")) parentID=getID(st.toCharArray());
+			st=r.getNextLine();
+		}
+		Parameter p=new Parameter(ID,declaredID,parentID);
+		Parameters.add(p);
+		checkForType(st);
+	}
+
 	private void interpretMethod(String st) throws Exception{
 		Long MethodID=getID(st.toCharArray());
 		st=r.getNextLine();
@@ -46,7 +93,7 @@ class Interpreter {
 		String signature="";
 		String modifiers="";
 		String kind="";
-		int cyclomaticComplexity=0;
+		int cyclomaticComplexity=1;
 		while(st!=null && !st.contains("FAMIX.")) {
 			if(st.contains("kind")) kind=getName(st.toCharArray());
 			if(st.contains("modifiers ")) modifiers=getModifiers(st.toCharArray());
@@ -111,14 +158,14 @@ class Interpreter {
 	
 	private void interpretAttribute(String st) throws Exception{
 		long AttributeID=getID(st.toCharArray());
-		Attribute a=new Attribute(AttributeID);
+		Attribute a=new Attribute(AttributeID,st.contains("LocalVariable"));
 		st=r.getNextLine();
 		long type=0,parentType=0;
 		String modifiers="";
 		while(st!=null && !st.contains("FAMIX.")) {
 			if(st.contains("declaredType")) type=getID(st.toCharArray());
 			if(st.contains("modifiers")) modifiers=getModifiers(st.toCharArray());
-			if(st.contains("parentType")) parentType=getID(st.toCharArray());
+			if(st.contains("parent")) parentType=getID(st.toCharArray());
 			st=r.getNextLine();
 		}
 		a.setContainerID(parentType);
@@ -298,6 +345,8 @@ class Interpreter {
 			long ID=a.getTypeID();
 			FamixClass c=getClassByID(ID);
 			a.setClass(c);
+			Method m=getMethodByID(a.getContainerID());
+			a.setContainerMethod(m);
 		}
 	}
 
@@ -317,6 +366,14 @@ class Interpreter {
 				}
 			}
 		}
+        Iterator<Attribute> it1=Attributes.iterator();
+		while(it1.hasNext()) {
+            Attribute a = it1.next();
+            if (a.isLocalVariable()) {
+                Method m = a.getContainerMethod();
+                m.addAccessedAttribute(a);
+            }
+        }
 	}
 
 	private void setContainerToAttribute(){
@@ -324,9 +381,62 @@ class Interpreter {
 		while(it.hasNext()){
 			Attribute a=it.next();
 			FamixClass Container=getClassByID(a.getContainerID());
-			if(Container!=null) Container.addAttribute(a);
+			if(Container!=null) {
+			    Container.addAttribute(a);
+            }else{
+			    Method m=getMethodByID(a.getContainerID());
+			    if(m!=null) {
+                    FamixClass c = m.getParent();
+                    if(c!=null) {
+                        c.addAttribute(a);
+                        Container = c;
+                    }
+                }
+            }
 			a.setContainer(Container);
 		}
+	}
+
+	private void setParameterToContainers(){
+		Iterator<Parameter> it=Parameters.iterator();
+		while(it.hasNext()){
+			Parameter p=it.next();
+			FamixClass c=getClassByID(p.getDeclaredID());
+			p.setDeclaredType(c);
+			Method m=getMethodByID(p.getContainerMethodID());
+			p.setContainerMethod(m);
+			m.addParameter(p);
+		}
+	}
+
+	private void setLVToContainers(){
+		Iterator<LocalVariable> it=LocalVariables.iterator();
+		while(it.hasNext()){
+			LocalVariable lv=it.next();
+			Method m=getMethodByID(lv.getContainerID());
+			m.addLocalVariable(lv);
+			lv.setContainerMethod(m);
+			FamixClass c=getClassByID(lv.getDeclaredID());
+			lv.setDeclaredType(c);
+		}
+	}
+
+	private void setAccess(){
+		Iterator<Access> it=Accesses.iterator();
+		while(it.hasNext()){
+			Access a=it.next();
+			Parameter p=getParameterByID(a.getVariableID());
+			if(p!=null) p.setAccess();
+		}
+	}
+
+	private Parameter getParameterByID(long ID){
+		Iterator<Parameter> it=Parameters.iterator();
+		while(it.hasNext()){
+			Parameter p=it.next();
+			if(p.getID()==ID) return p;
+		}
+		return null;
 	}
 
 	public void initialize() {
@@ -359,16 +469,20 @@ class Interpreter {
 	}
 
 	public String getClassMetrics(){
-        String st="file,class,AMW,WMC,NOM,NOPA\n";
+        String st="file,class,AMW,WMC,NOM,NOPA,NOAV\n";
         Iterator<FamixClass> it=Classes.iterator();
         while(it.hasNext()){
         	FamixClass c=it.next();
         	if(c.getContainingFile()!=null){
-        		st=st+c.getContainingFile().getFileName()+","+c.getName()+","+c.getMetrics()+"\n";
+        		st=st+c.getContainingFile().getFileName()+","+c.getClassName()+","+c.getMetrics()+"\n";
 			}
 		}
         return st;
     }
+
+    public void checkParameters(){
+
+	}
 
 	public String toString() {
 		String st="source,target,extCalls,extData,hierarchy\n";

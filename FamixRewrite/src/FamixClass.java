@@ -7,6 +7,7 @@ import java.util.Set;
 
 class FamixClass {
 	private long ID;
+	private String ClassName;
 	private String Name;
 	private ArrayList<Method> OverrideOrSpecializeMethods=new ArrayList<Method> ();
 	private ArrayList<Method> ContainedMethods=new ArrayList<Method> ();
@@ -30,6 +31,7 @@ class FamixClass {
 		this.ID=ID;
 		this.Name=Name;
 		this.Interface=Interface;
+		ClassName=Name;
 	}
 
 	public Set<Method> getCalledMethods(){
@@ -147,13 +149,22 @@ class FamixClass {
 		return false;
 	}
 
+	public String getClassName(){
+		return ClassName;
+	}
 	public double getAMW(){
 	    return ContainedMethods.stream()
-				.filter(m -> m.getCyclomaticComplexity()!=0)
+				.filter(method-> !method.getSignature().contains("<init>"))
                 .mapToInt(Method::getCyclomaticComplexity)
                 .average()
                 .orElse(0);
     }
+
+    public int getNOAV(){
+		return ContainedMethods.stream()
+				.mapToInt(Method::getNoAttributes)
+				.sum();
+	}
 
 	public Double round(Double d){
 		return ((double) ((int) (d*100)))/100;
@@ -161,17 +172,20 @@ class FamixClass {
 
     public int getWMC(){
 		return ContainedMethods.stream()
+				.filter(method -> !method.getSignature().contains("<init>"))
 				.mapToInt(Method::getCyclomaticComplexity)
 				.sum();
 	}
 
 	public int getNOM(){
-		return ContainedMethods.size();
+		return (int) ContainedMethods.stream()
+				.filter(method -> !method.getSignature().contains("<init>"))
+				.count();
 	}
 
 	public String getMetrics(){
 		String st="";
-		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA();
+		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA()+","+getNOAV();
 		return st;
 	}
 

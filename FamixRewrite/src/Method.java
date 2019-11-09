@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -8,7 +9,9 @@ class Method {
 	private FamixClass ParentClass;
 	private String signature;
 	private String modifiers;
-	private int cyclomaticComplexity;
+	private int cyclomaticComplexity=1;
+	private ArrayList<Parameter> parameters=new ArrayList<Parameter>();
+	private ArrayList<LocalVariable> localVariables=new ArrayList<LocalVariable>();
 	private Set<Method> CalledMethods=new HashSet<Method> ();
 	private Set<Attribute> AccessedAttributes=new HashSet<Attribute> ();
 	private Set<Method> ProtectedMethods=new HashSet<Method> ();
@@ -21,6 +24,15 @@ class Method {
 		this.modifiers=modifiers;
 		this.cyclomaticComplexity=cyclomaticComplexity;
 	}
+	public void addLocalVariable(LocalVariable lv){
+	     localVariables.add(lv);
+    }
+	public void addParameter(Parameter p){
+	     parameters.add(p);
+    }
+    public int getNoAttributes(){
+	    return AccessedAttributes.size()+ProtectedAttributes.size();
+    }
 	public int getCyclomaticComplexity(){
 	    return cyclomaticComplexity;
     }
@@ -82,6 +94,9 @@ class Method {
 	}
 	public void addAccessedAttribute(Attribute a) {
 		AccessedAttributes.add(a);
+	}
+	public boolean isAccessor(){
+		return true;
 	}
 	public String toString() {
 		String st="";

@@ -3,10 +3,22 @@ class Attribute {
 	private FamixClass Type;
 	private String modifiers;
 	private FamixClass Container;
+	private Method ContainerMethod;
 	private long containerID;
-	public Attribute(long ID) {
+	private boolean localVariable=false;
+	public Attribute(long ID,boolean localVariable) {
 		this.ID=ID;
+		this.localVariable=localVariable;
 	}
+	public boolean isLocalVariable(){
+	    return localVariable;
+    }
+	public void setContainerMethod(Method m){
+	    ContainerMethod=m;
+    }
+    public Method getContainerMethod(){
+	    return ContainerMethod;
+    }
 	public long getContainerID(){
 		return containerID;
 	}
