@@ -622,7 +622,7 @@ class Interpreter {
 	}
 
 	public String getClassMetrics(){
-        String st="file,class,AMW,WMC,NOM,NOPA,NOAV\n";
+        String st="file,class,AMW,WMC,NOM,NOPA,NOAV,NProtM\n";
         Iterator<FamixClass> it=Classes.iterator();
         while(it.hasNext()){
         	FamixClass c=it.next();

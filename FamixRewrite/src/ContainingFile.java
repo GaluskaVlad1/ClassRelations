@@ -142,7 +142,7 @@ class ContainingFile {
 			FamixClass c=a.getType();
 			ContainingFile f=null;
 			if(c!=null) c.getContainingFile();
-			if(f!=null && f!=this) AddFileToMap(FileInheritanceRelations,f,2);
+			if(f!=null && f!=this) AddFileToMap(FileInheritanceRelations,f,1);
 		}
 	}
 

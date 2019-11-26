@@ -80,19 +80,20 @@ class FamixClass {
 		Iterator<Method> it=ContainedMethods.iterator();
 		while(it.hasNext()) {
 			Method m=it.next();
-			FamixClass c=this.isOverrideOrSpecialize(m);
-			if(c!=null) {
-				OverrideOrSpecializeMethods.add(m);
-				addClassToMap(InheritanceRelations,c,2);
-				if(OverrideRelations.containsKey(c)){
-					OverrideRelations.get(c).add(m);
-				}
-				else{
-					ArrayList<Method> adder=new ArrayList<Method>();
-					adder.add(m);
-					OverrideRelations.put(c,adder);
-				}
-			}
+			if(!m.getSignature().contains("<init>")) {
+                FamixClass c = this.isOverrideOrSpecialize(m);
+                if (c != null) {
+                    OverrideOrSpecializeMethods.add(m);
+                    addClassToMap(InheritanceRelations, c, 2);
+                    if (OverrideRelations.containsKey(c)) {
+                        OverrideRelations.get(c).add(m);
+                    } else {
+                        ArrayList<Method> adder = new ArrayList<Method>();
+                        adder.add(m);
+                        OverrideRelations.put(c, adder);
+                    }
+                }
+            }
 		}
 		setInherits();
 		
@@ -222,9 +223,28 @@ class FamixClass {
 				.count();
 	}
 
+	public int getNProtMA(){
+        return (int)AccessedAttributes.stream()
+                .filter(attribute->attribute!=null)
+                .filter(attribute -> attribute.isProtected())
+                .count()+
+                (int)ProtectedAccessedAttributes.stream()
+                        .filter(attribute->attribute!=null)
+                        .filter(attribute -> attribute.isProtected())
+                        .count();
+    }
+
+    public int getNProtMM(){
+	    return (int)ContainedMethods.stream()
+                .filter(method -> method.isProtected())
+                .count();
+    }
+    public int getNProtM(){
+	    return getNProtMA()+getNProtMM();
+    }
 	public String getMetrics(){
 		String st="";
-		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA()+","+getNOAV();
+		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA()+","+getNOAV()+","+getNProtM();
 		return st;
 	}
 
@@ -238,10 +258,14 @@ class FamixClass {
 	}
 
 	public int getNOPA(){
-		return (int)ContainedAttributes.stream()
+		return (int)AccessedAttributes.stream()
 				.filter(attribute -> attribute!=null)
 				.filter(Attribute::isPublic)
-				.count();
+				.count()+
+                (int)ProtectedAccessedAttributes.stream()
+                        .filter(attribute -> attribute!=null)
+                        .filter(Attribute::isPublic)
+                        .count();
 	}
 
 	public boolean isMethodInherited(Method m) {
