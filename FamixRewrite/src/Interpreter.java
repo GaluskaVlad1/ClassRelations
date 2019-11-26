@@ -1,3 +1,4 @@
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 class Interpreter {
 	private ArrayList<FamixClass> Classes=new ArrayList<FamixClass> ();
@@ -9,7 +10,9 @@ class Interpreter {
 	private ArrayList<ContainingFile> Files=new ArrayList<ContainingFile> ();
 	private ArrayList<Parameter> Parameters=new ArrayList<Parameter> ();
 	private ArrayList<LocalVariable> LocalVariables=new ArrayList<LocalVariable>();
+	private ArrayList<ParametrizedType> ParamTypes=new ArrayList<ParametrizedType>();
 	private Reader r;
+	private long maxID=0;
 	public void setReader(Reader r) {
 		this.r=r;
 	}
@@ -44,9 +47,14 @@ class Interpreter {
 			interpretAccess();
 			return;
 		}
+		if(st.contains("(FAMIX.ParameterizedType ")){
+			interpretParameterizedType(st);
+			return;
+		}
 	}
 
 	private void interpretAccess() throws Exception{
+		maxID++;
 		String st=r.getNextLine();
 		long variableID=0;
 		while(st!=null && !st.contains("(FAMIX.")){
@@ -58,8 +66,42 @@ class Interpreter {
 		checkForType(st);
 	}
 
+	private void interpretParameterizedType(String st) throws Exception{
+		maxID=getID(st.toCharArray());
+		ArrayList<Long> l=new ArrayList<Long>();
+		long parameterizableClassID=0;
+		st=r.getNextLine();
+		while(st!=null && !st.contains("(FAMIX.")){
+			if(st.contains("arguments"))  l=getArguments(st.toCharArray());
+			if(st.contains("parameterizableClass")) parameterizableClassID=getID(st.toCharArray());
+			st=r.getNextLine();
+		}
+		ParametrizedType p=new ParametrizedType();
+		p.arguments=l;
+		p.parameterizableClassID=parameterizableClassID;
+		p.ID=maxID;
+		ParamTypes.add(p);
+		checkForType(st);
+	}
+	private ArrayList<Long> getArguments(char[] chArray){
+		ArrayList<Long> l=new ArrayList<Long>();
+		for(int i=0;i<chArray.length;i++){
+			ArrayList<Character> Digits=new ArrayList<Character>();
+			if(chArray[i]=='(' && chArray[i+1]=='r'){
+				while(chArray[i]>='0' && chArray[i]<='9'){
+					Digits.add(chArray[i]);
+					i++;
+				}
+				long nr=digitsListToLong(Digits);
+				l.add(nr);
+			}
+			if(chArray[i]==')' && chArray[i+1]==')') return l;
+		}
+		return l;
+	}
 	private void interpretLocalVariable(String st) throws Exception{
 		long ID=getID(st.toCharArray());
+		maxID=ID;
 		long containerID=0,declaredID=0;
 		st=r.getNextLine();
 		while(st!=null && !st.contains("(FAMIX.")){
@@ -74,6 +116,7 @@ class Interpreter {
 
 	private void interpretParameter(String st)throws Exception{
 		long ID=getID(st.toCharArray());
+		maxID=ID;
 		st=r.getNextLine();
 		long declaredID=0,parentID=0;
 		while(st!=null && !st.contains("FAMIX")){
@@ -88,6 +131,7 @@ class Interpreter {
 
 	private void interpretMethod(String st) throws Exception{
 		Long MethodID=getID(st.toCharArray());
+		maxID=MethodID;
 		st=r.getNextLine();
 		Long parentType=0L;
 		String signature="";
@@ -124,6 +168,7 @@ class Interpreter {
 	}
 	
 	private void interpretInvocation() throws Exception{
+		maxID++;
 		String st=r.getNextLine();
 		long candidateID=0;
 		long receiverID=0;
@@ -142,6 +187,7 @@ class Interpreter {
 	}
 	
 	private void interpretInheritance() throws Exception{
+		maxID++;
 		String st=r.getNextLine();
 		while(!st.contains("subclass")) {
 			st=r.getNextLine();
@@ -158,6 +204,7 @@ class Interpreter {
 	
 	private void interpretAttribute(String st) throws Exception{
 		long AttributeID=getID(st.toCharArray());
+		maxID=AttributeID;
 		Attribute a=new Attribute(AttributeID,st.contains("LocalVariable"));
 		st=r.getNextLine();
 		long type=0,parentType=0;
@@ -178,6 +225,7 @@ class Interpreter {
 	private void interpretFile() throws Exception{
 		String st=r.getNextLine();
 		long ID=getID(st.toCharArray());
+		maxID=ID;
 		while(!st.contains("fileName")) {
 			st=r.getNextLine();
 		}
@@ -199,16 +247,21 @@ class Interpreter {
 	}
 	
 	private void interpretClass(String st) throws Exception{
+		boolean container=st.contains("FAMIX.ParameterizableClass");
 		long ClassID=getID(st.toCharArray());
+		maxID=ClassID;
+		long containerID=0;
 		st=r.getNextLine();
 		String ClassName=getName(st.toCharArray());
 		st=r.getNextLine();
 		boolean Interface=false;
-		while(st!=null && !st.contains("isInterface") && !st.contains("FAMIX.")) {
+		while(st!=null && !st.contains("FAMIX.")) {
+		    if(st.contains("(container ")) containerID=getID(st.toCharArray());
+		    if(st.contains("isInterface")) Interface=true;
 			st = r.getNextLine();
 		}
 		if(st!=null && st.contains("isInterface")) Interface=true;
-		FamixClass c=new FamixClass(Interface,ClassID,ClassName);
+		FamixClass c=new FamixClass(Interface,ClassID,ClassName,containerID);
 		Classes.add(c);
 		checkForType(st);
 	}
@@ -376,6 +429,91 @@ class Interpreter {
         }
 	}
 
+	private void setAttributesToParametrizableClasses(){
+		Iterator<Access> it=Accesses.iterator();
+		while(it.hasNext()){
+			Access ac=it.next();
+			Attribute a=getAttributeByID(ac.getVariableID());
+			if(a==null) return;
+			FamixClass type=a.getType();
+			Method m=a.getContainerMethod();
+			if(m!=null) {
+				FamixClass containerClass = m.getParent();
+				if (containerClass.getContainer()) {
+					if (containerClass.getContainedTypes().contains(type)) {
+						addAttribute(type.getExtender(), a, m);
+					}else {
+						if (a.isProtected()) containerClass.addProtectedAttribute(a);
+						else containerClass.addAccessedAttribute(a);
+					}
+				} else {
+					if (a.isProtected()) m.addProtectedAttribute(a);
+					else m.addAccessedAttribute(a);
+				}
+			}else{
+				FamixClass containerClass=getClassByID(a.getContainerID());
+				if(containerClass.getContainer()){
+					if(containerClass.getContainedTypes().contains(type)){
+						addAttribute(type.getExtender(),a,containerClass);
+					}else{
+						if(a.isProtected()) containerClass.addProtectedAttribute(a);
+						else containerClass.addAccessedAttribute(a);
+					}
+				}else{
+					if(a.isProtected()) containerClass.addProtectedAttribute(a);
+					else containerClass.addAccessedAttribute(a);
+				}
+			}
+		}
+	}
+
+	private void addAttribute(FamixClass classSwitcher,Attribute cloned,Method container){
+		maxID++;
+		Attribute a=new Attribute(maxID,cloned.isLocalVariable());
+		if(classSwitcher==null) return;
+		a.setType(classSwitcher.getID());
+		a.setClass(classSwitcher);
+		a.setContainerID(cloned.getContainerID());
+		a.setContainerMethod(cloned.getContainerMethod());
+		a.setModifiers(cloned.getModifiers());
+		if(a.isProtected()) container.addProtectedAttribute(a);
+		else container.addAccessedAttribute(a);
+		Attributes.add(a);
+	}
+
+	private void addAttribute(FamixClass classSwitcher,Attribute cloned,FamixClass container){
+		maxID++;
+		if(container==null) return;
+		Attribute a=new Attribute(maxID,cloned.isLocalVariable());
+		if(classSwitcher==null) return;
+		a.setType(classSwitcher.getID());
+		a.setContainerID(cloned.getContainerID());
+		a.setContainer(container);
+		a.setClass(classSwitcher);
+		a.setModifiers(cloned.getModifiers());
+		if(a.isProtected()) container.addProtectedAttribute(a);
+		else container.addAccessedAttribute(a);
+		Attributes.add(a);
+	}
+
+	private void setLocalParametrized(){
+		for(int i=0;i<Attributes.size();i++){
+			Attribute a=Attributes.get(i);
+			if(a.isLocalVariable()){
+				FamixClass type=a.getType();
+				Method m=getMethodByID(a.getContainerID());
+				FamixClass container;
+				if(m!=null){
+					if(type==null) return;
+					addAttribute(type.getExtender(),a,m);
+				}else{
+					container=getClassByID(a.getContainerID());
+					addAttribute(type.getExtender(),a,container);
+				}
+			}
+		}
+	}
+
 	private void setContainerToAttribute(){
 		Iterator<Attribute> it=Attributes.iterator();
 		while(it.hasNext()){
@@ -409,43 +547,57 @@ class Interpreter {
 		}
 	}
 
-	private void setLVToContainers(){
-		Iterator<LocalVariable> it=LocalVariables.iterator();
-		while(it.hasNext()){
-			LocalVariable lv=it.next();
-			Method m=getMethodByID(lv.getContainerID());
-			m.addLocalVariable(lv);
-			lv.setContainerMethod(m);
-			FamixClass c=getClassByID(lv.getDeclaredID());
-			lv.setDeclaredType(c);
+	private void setParameterizedAttributes(){
+		Iterator<Attribute> it=Attributes.iterator();
+		for(int i=0;i<Attributes.size();i++){
+			Attribute a=Attributes.get(i);
+			ParametrizedType p=getParametrizedTypeByID(a.getTypeID());
+			if(p!=null){
+				Method m=getMethodByID(a.getContainerID());
+				FamixClass container;
+				if(m!=null) {
+					addAttribute(getClassByID(p.parameterizableClassID), a, m);
+				}
+				else {
+					container = getClassByID(a.getContainerID());
+					addAttribute(getClassByID(p.parameterizableClassID), a, container);
+				}
+			}
 		}
 	}
 
-	private void setAccess(){
-		Iterator<Access> it=Accesses.iterator();
+	public ParametrizedType getParametrizedTypeByID(long ID){
+		Iterator<ParametrizedType> it=ParamTypes.iterator();
 		while(it.hasNext()){
-			Access a=it.next();
-			Parameter p=getParameterByID(a.getVariableID());
-			if(p!=null) p.setAccess();
-		}
-	}
-
-	private Parameter getParameterByID(long ID){
-		Iterator<Parameter> it=Parameters.iterator();
-		while(it.hasNext()){
-			Parameter p=it.next();
-			if(p.getID()==ID) return p;
+			ParametrizedType p=it.next();
+			if(p.ID==ID) return p;
 		}
 		return null;
 	}
+	private void setContainerToClass(){
+        Iterator<FamixClass> it=Classes.iterator();
+        while(it.hasNext()){
+            FamixClass c=it.next();
+            long containerID=c.getContainerID();
+            FamixClass container=getClassByID(containerID);
+            if(container!=null) {
+            	container.addContainedType(c);
+            	container.setContainer();
+			}
+        }
+    }
 
 	public void initialize() {
+		setContainerToClass();
 		setContainingFiles();
 		setClassesMethods();
 		setClassToAttribute();
 		setInheritanceRelations();
 		setInvocations();
 		setContainerToAttribute();
+		setAttributesToParametrizableClasses();
+		setLocalParametrized();
+		setParameterizedAttributes();
 		Iterator<FamixClass> it=Classes.iterator();
 		while(it.hasNext()) {
 			FamixClass c=it.next();
@@ -456,6 +608,7 @@ class Interpreter {
 			FamixClass c=it.next();
 			c.set();
 		}
+
 		Iterator<ContainingFile> itf=Files.iterator();
 		while(itf.hasNext()){
 			ContainingFile f=itf.next();

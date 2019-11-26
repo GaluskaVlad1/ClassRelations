@@ -63,6 +63,9 @@ class Attribute {
 		}
 		return false;
 	}
+	public String getModifiers(){
+		return modifiers;
+	}
 	public String toString() {
 		String st=""+ID;
 		return st;

@@ -8,6 +8,10 @@ import java.util.Set;
 class FamixClass {
 	private long ID;
 	private String ClassName;
+	private boolean isParametrizedType=false;
+	private Set<FamixClass> ParametrizedClasses=new HashSet<FamixClass> ();
+	private long containerID;
+	private ArrayList<FamixClass> containedTypes=new ArrayList<FamixClass>();
 	private String Name;
 	private ArrayList<Method> OverrideOrSpecializeMethods=new ArrayList<Method> ();
 	private ArrayList<Method> ContainedMethods=new ArrayList<Method> ();
@@ -27,13 +31,27 @@ class FamixClass {
 	private boolean isFromJava=true;
 	private boolean Interface;
 
-	public FamixClass(boolean Interface, long ID, String Name) {
+	public FamixClass(boolean Interface, long ID, String Name,long containerID) {
 		this.ID=ID;
 		this.Name=Name;
 		this.Interface=Interface;
+		this.containerID=containerID;
 		ClassName=Name;
 	}
 
+	public boolean isInterface(){
+	    return Interface;
+    }
+	public void addContainedType(FamixClass c){
+        containedTypes.add(c);
+    }
+
+    public ArrayList<FamixClass> getContainedTypes(){
+	    return containedTypes;
+    }
+	public long getContainerID(){
+	    return containerID;
+    }
 	public Set<Method> getCalledMethods(){
 		return CalledMethods;
 	}
@@ -94,8 +112,31 @@ class FamixClass {
 		}
 	}
 
+	public void addParametrizedClass(FamixClass c){
+		ParametrizedClasses.add(c);
+	}
+
+	public Set<FamixClass> getParametrizedClasses(){
+		return ParametrizedClasses;
+	}
+
 	public ArrayList<Method> getOverrideOrSpecialize(){
 		return OverrideOrSpecializeMethods;
+	}
+
+	public boolean getContainer(){
+		return isParametrizedType;
+	}
+
+	public int getContainedNumber(FamixClass c){
+		Iterator<FamixClass> it=containedTypes.iterator();
+		int cnt=0;
+		while(it.hasNext()){
+			FamixClass c1=it.next();
+			cnt++;
+			if(c1.equals(c)) return	cnt;
+		}
+		return cnt;
 	}
 
 	public boolean hasMethod(String signature) {
@@ -161,9 +202,7 @@ class FamixClass {
     }
 
     public int getNOAV(){
-		return ContainedMethods.stream()
-				.mapToInt(Method::getNoAttributes)
-				.sum();
+		return ProtectedAccessedAttributes.size()+AccessedAttributes.size();
 	}
 
 	public Double round(Double d){
@@ -187,6 +226,15 @@ class FamixClass {
 		String st="";
 		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA()+","+getNOAV();
 		return st;
+	}
+
+
+	public FamixClass getExtender(){
+	    if(InheritedClasses.size()>=1) return InheritedClasses.get(0);
+	    else return null;
+    }
+	public void setContainer(){
+		isParametrizedType=true;
 	}
 
 	public int getNOPA(){
@@ -216,6 +264,13 @@ class FamixClass {
 		}
 	}
 
+	public void addProtectedAttribute(Attribute a){
+	    ProtectedAccessedAttributes.add(a);
+    }
+
+    public void addAccessedAttribute(Attribute a){
+	    AccessedAttributes.add(a);
+    }
 	private void setMapForAccessedProtectedAttributes() {
 		Iterator<Attribute> it=ProtectedAccessedAttributes.iterator();
 		while(it.hasNext()) {
@@ -308,6 +363,13 @@ class FamixClass {
 	public int hashCode() {
 		return (int) (ID ^ (ID >>>32));
 	}
+
+	public Method getInit(){
+	    return ContainedMethods.stream()
+                .filter(method -> method.getSignature().equals("<init>"))
+                .findFirst()
+                .orElse(null);
+    }
 	
 	public String toString() {
 		String st="";
