@@ -3,13 +3,33 @@ class Attribute {
 	private FamixClass Type;
 	private String modifiers;
 	private FamixClass Container;
+	private boolean isParamType=false;
 	private Method ContainerMethod;
 	private long containerID;
 	private boolean localVariable=false;
-	public Attribute(long ID,boolean localVariable) {
+	private boolean parameter=false;
+	public Attribute(long ID,boolean localVariable,boolean parameter) {
 		this.ID=ID;
 		this.localVariable=localVariable;
+		this.parameter=parameter;
 	}
+	public boolean isParameter(){
+	    return parameter;
+    }
+    public boolean isViable(){
+	    if(Type==null) return false;
+	    return Type.isViable();
+    }
+    public boolean isUserDefined(){
+		if(Type==null) return false;
+		return Type.isUserDefined();
+	}
+	public boolean isParamType(){
+	    return isParamType;
+    }
+    public void setParamType(){
+	    isParamType=true;
+    }
 	public boolean isLocalVariable(){
 	    return localVariable;
     }

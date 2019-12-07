@@ -1,12 +1,8 @@
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 class FamixClass {
 	private long ID;
+	private boolean viable=true;
 	private String ClassName;
 	private boolean isParametrizedType=false;
 	private Set<FamixClass> ParametrizedClasses=new HashSet<FamixClass> ();
@@ -39,8 +35,36 @@ class FamixClass {
 		ClassName=Name;
 	}
 
+	public void setNotViable(){
+        viable=false;
+    }
+
 	public boolean isInterface(){
 	    return Interface;
+    }
+
+    public boolean isViable(){
+	    return viable;
+    }
+    public int getATFD(){
+        return  (int)AccessedAttributes.stream()
+                .filter(attribute -> attribute.getContainerMethod()!=null)
+                .filter(Attribute::isUserDefined)
+                .filter(attribute -> !isRelated(attribute.getType()))
+                .filter(attribute->attribute.getType().isViable())
+                .count();
+    }
+
+    public boolean isRelated(FamixClass c){
+        if(this.equals(c)) return true;
+        else{
+            Iterator<FamixClass> it=InheritedClasses.iterator();
+            while(it.hasNext()){
+                FamixClass c1=it.next();
+                if(c1.isRelated(c)) return true;
+            }
+        }
+        return false;
     }
 	public void addContainedType(FamixClass c){
         containedTypes.add(c);
@@ -129,6 +153,9 @@ class FamixClass {
 		return isParametrizedType;
 	}
 
+	public ArrayList<Method> getContainedMethods(){
+	    return ContainedMethods;
+    }
 	public int getContainedNumber(FamixClass c){
 		Iterator<FamixClass> it=containedTypes.iterator();
 		int cnt=0;
@@ -203,7 +230,8 @@ class FamixClass {
     }
 
     public int getNOAV(){
-		return ProtectedAccessedAttributes.size()+AccessedAttributes.size();
+		return (int) ProtectedAccessedAttributes.stream()
+        .filter(Attribute::isUserDefined).filter(Attribute::isViable).count()+(int)AccessedAttributes.stream().filter(Attribute::isUserDefined).filter(Attribute::isViable).count();
 	}
 
 	public Double round(Double d){
@@ -224,14 +252,10 @@ class FamixClass {
 	}
 
 	public int getNProtMA(){
-        return (int)AccessedAttributes.stream()
-                .filter(attribute->attribute!=null)
-                .filter(attribute -> attribute.isProtected())
-                .count()+
-                (int)ProtectedAccessedAttributes.stream()
-                        .filter(attribute->attribute!=null)
-                        .filter(attribute -> attribute.isProtected())
-                        .count();
+        return (int)ContainedAttributes.stream()
+                .filter(Attribute::isProtected)
+                .filter(Attribute::isViable)
+                .count();
     }
 
     public int getNProtMM(){
@@ -239,16 +263,56 @@ class FamixClass {
                 .filter(method -> method.isProtected())
                 .count();
     }
+
+    public boolean isUserDefined(){
+	    if(File==null) return false;
+	    return true;
+    }
     public int getNProtM(){
 	    return getNProtMA()+getNProtMM();
     }
 	public String getMetrics(){
 		String st="";
-		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA()+","+getNOAV()+","+getNProtM();
+		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA()+","+getNOAV()+","+getNProtM()+","+getATFD()+","+getFDP()+","+round(getTCC());
 		return st;
 	}
 
+	public double getTCC(){
+        int NP=(int)ContainedMethods.stream()
+                .filter(method -> !method.isConstr())
+                .filter(method -> !method.getSignature().contains("<init>"))
+                .count();
+        if(NP==1) return (double) 1;
+        NP=(NP * (NP-1))/ 2;
+        int NDC=0;
+        for(int i=0;i<ContainedMethods.size();i++){
+            Method current=ContainedMethods.get(i);
+            if(!current.getSignature().contains("<init>") && !current.isConstr()) {
+                for (int j = i + 1; j < ContainedMethods.size(); j++) {
+                    Method next = ContainedMethods.get(j);
+                    if (!next.getSignature().contains("<init>") && !next.isConstr()) {
+                        NDC = NDC + next.howManyAttributesAccessesOutOfSet(current.getAccessedAttributes());
+                        NDC = NDC + next.howManyAttributesAccessesOutOfSet(current.getProtectedAttributesAccessed());
+                    }
+                }
+            }
+        }
+        if(NP==0) return 0;
+        return ((double)NDC)/((double)NP);
+    }
 
+	public int getFDP(){
+	    return getFDPFromSetAttributes(AccessedAttributes)+getFDPFromSetAttributes(ProtectedAccessedAttributes);
+    }
+
+    public int getFDPFromSetAttributes(Collection<Attribute> a){
+	    return (int)a.stream()
+                .filter(Attribute::isUserDefined)
+                .map(Attribute::getType)
+                .filter(FamixClass::isViable)
+                .distinct()
+                .count();
+    }
 	public FamixClass getExtender(){
 	    if(InheritedClasses.size()>=1) return InheritedClasses.get(0);
 	    else return null;
@@ -258,14 +322,10 @@ class FamixClass {
 	}
 
 	public int getNOPA(){
-		return (int)AccessedAttributes.stream()
-				.filter(attribute -> attribute!=null)
-				.filter(Attribute::isPublic)
-				.count()+
-                (int)ProtectedAccessedAttributes.stream()
-                        .filter(attribute -> attribute!=null)
-                        .filter(Attribute::isPublic)
-                        .count();
+		return (int)ContainedAttributes.stream()
+                .filter(Attribute::isViable)
+                .filter(Attribute::isPublic)
+                .count();
 	}
 
 	public boolean isMethodInherited(Method m) {

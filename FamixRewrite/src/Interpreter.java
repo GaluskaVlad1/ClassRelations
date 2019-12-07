@@ -11,6 +11,7 @@ class Interpreter {
 	private ArrayList<Parameter> Parameters=new ArrayList<Parameter> ();
 	private ArrayList<LocalVariable> LocalVariables=new ArrayList<LocalVariable>();
 	private ArrayList<ParametrizedType> ParamTypes=new ArrayList<ParametrizedType>();
+	private Map<Attribute,Attribute> AttributeConnections=new HashMap<Attribute,Attribute>();
 	private Reader r;
 	private long maxID=0;
 	public void setReader(Reader r) {
@@ -57,11 +58,13 @@ class Interpreter {
 		maxID++;
 		String st=r.getNextLine();
 		long variableID=0;
+		long accessorID=0;
 		while(st!=null && !st.contains("(FAMIX.")){
 			if(st.contains("variable ")) variableID=getID(st.toCharArray());
+			if(st.contains("(accessor ")) accessorID=getID(st.toCharArray());
 			st=r.getNextLine();
 		}
-		Access a=new Access(variableID);
+		Access a=new Access(variableID,accessorID);
 		Accesses.add(a);
 		checkForType(st);
 	}
@@ -205,7 +208,7 @@ class Interpreter {
 	private void interpretAttribute(String st) throws Exception{
 		long AttributeID=getID(st.toCharArray());
 		maxID=AttributeID;
-		Attribute a=new Attribute(AttributeID,st.contains("LocalVariable"));
+		Attribute a=new Attribute(AttributeID,st.contains("LocalVariable"),st.contains("FAMIX.Parameter "));
 		st=r.getNextLine();
 		long type=0,parentType=0;
 		String modifiers="";
@@ -414,8 +417,19 @@ class Interpreter {
 			if(i.hasReceiver()) {
 				Attribute receiver=getAttributeByID(i.getReceiverID());
 				if(receiver!=null) {
-					if (receiver.isProtected()) candidate.addProtectedAttribute(receiver);
-					else candidate.addAccessedAttribute(receiver);
+					if(candidate.getParent()==null) continue;
+					if(!candidate.getParent().getContainer()) {
+						if (receiver.isProtected()) candidate.addProtectedAttribute(receiver);
+						else candidate.addAccessedAttribute(receiver);
+					}else{
+						if(candidate.getParent().getContainedTypes().contains(receiver.getType())){
+							receiver.getType().setNotViable();
+							addAttribute(receiver.getType().getExtender(),receiver,candidate);
+						}else{
+							if(receiver.isProtected()) candidate.addProtectedAttribute(receiver);
+							else candidate.addAccessedAttribute(receiver);
+						}
+					}
 				}
 			}
 		}
@@ -434,6 +448,7 @@ class Interpreter {
 		while(it.hasNext()){
 			Access ac=it.next();
 			Attribute a=getAttributeByID(ac.getVariableID());
+			Method mac=getMethodByID(ac.getAccessorID());
 			if(a==null) return;
 			FamixClass type=a.getType();
 			Method m=a.getContainerMethod();
@@ -441,10 +456,11 @@ class Interpreter {
 				FamixClass containerClass = m.getParent();
 				if (containerClass.getContainer()) {
 					if (containerClass.getContainedTypes().contains(type)) {
+						type.setNotViable();
 						addAttribute(type.getExtender(), a, m);
 					}else {
-						if (a.isProtected()) containerClass.addProtectedAttribute(a);
-						else containerClass.addAccessedAttribute(a);
+						if (a.isProtected()) m.addProtectedAttribute(a);
+						else m.addAccessedAttribute(a);
 					}
 				} else {
 					if (a.isProtected()) m.addProtectedAttribute(a);
@@ -454,46 +470,76 @@ class Interpreter {
 				FamixClass containerClass=getClassByID(a.getContainerID());
 				if(containerClass.getContainer()){
 					if(containerClass.getContainedTypes().contains(type)){
+						type.setNotViable();
+						addAttribute(type.getExtender(),a,mac);
 						addAttribute(type.getExtender(),a,containerClass);
 					}else{
-						if(a.isProtected()) containerClass.addProtectedAttribute(a);
-						else containerClass.addAccessedAttribute(a);
+						if(a.isProtected()){
+							containerClass.addProtectedAttribute(a);
+							mac.addProtectedAttribute(a);
+						}
+						else{
+							containerClass.addAccessedAttribute(a);
+							mac.addAccessedAttribute(a);
+						}
 					}
 				}else{
-					if(a.isProtected()) containerClass.addProtectedAttribute(a);
-					else containerClass.addAccessedAttribute(a);
+					if(a.isProtected()){
+						containerClass.addProtectedAttribute(a);
+						mac.addProtectedAttribute(a);
+					}
+					else{
+						containerClass.addAccessedAttribute(a);
+						mac.addAccessedAttribute(a);
+					}
 				}
 			}
 		}
 	}
 
 	private void addAttribute(FamixClass classSwitcher,Attribute cloned,Method container){
-		maxID++;
-		Attribute a=new Attribute(maxID,cloned.isLocalVariable());
-		if(classSwitcher==null) return;
-		a.setType(classSwitcher.getID());
-		a.setClass(classSwitcher);
-		a.setContainerID(cloned.getContainerID());
-		a.setContainerMethod(cloned.getContainerMethod());
-		a.setModifiers(cloned.getModifiers());
-		if(a.isProtected()) container.addProtectedAttribute(a);
-		else container.addAccessedAttribute(a);
-		Attributes.add(a);
+		cloned.setParamType();
+		if(!AttributeConnections.containsKey(cloned)) {
+			maxID++;
+			Attribute a = new Attribute(maxID, cloned.isLocalVariable(), cloned.isParameter());
+			if (classSwitcher == null) return;
+			a.setType(classSwitcher.getID());
+			a.setClass(classSwitcher);
+			a.setContainerID(cloned.getContainerID());
+			a.setContainerMethod(cloned.getContainerMethod());
+			a.setModifiers(cloned.getModifiers());
+			if (a.isProtected()) container.addProtectedAttribute(a);
+			else container.addAccessedAttribute(a);
+			Attributes.add(a);
+			AttributeConnections.put(cloned,a);
+		}else{
+			Attribute a=AttributeConnections.get(cloned);
+			if(a.isProtected()) container.addProtectedAttribute(a);
+			else container.addAccessedAttribute(a);
+		}
 	}
 
 	private void addAttribute(FamixClass classSwitcher,Attribute cloned,FamixClass container){
-		maxID++;
-		if(container==null) return;
-		Attribute a=new Attribute(maxID,cloned.isLocalVariable());
-		if(classSwitcher==null) return;
-		a.setType(classSwitcher.getID());
-		a.setContainerID(cloned.getContainerID());
-		a.setContainer(container);
-		a.setClass(classSwitcher);
-		a.setModifiers(cloned.getModifiers());
-		if(a.isProtected()) container.addProtectedAttribute(a);
-		else container.addAccessedAttribute(a);
-		Attributes.add(a);
+		cloned.setParamType();
+		if(!AttributeConnections.containsKey(cloned)) {
+			maxID++;
+			if (container == null) return;
+			Attribute a = new Attribute(maxID, cloned.isLocalVariable(), cloned.isParameter());
+			if (classSwitcher == null) return;
+			a.setType(classSwitcher.getID());
+			a.setContainerID(cloned.getContainerID());
+			a.setContainer(container);
+			a.setClass(classSwitcher);
+			a.setModifiers(cloned.getModifiers());
+			if (a.isProtected()) container.addProtectedAttribute(a);
+			else container.addAccessedAttribute(a);
+			Attributes.add(a);
+			AttributeConnections.put(cloned,a);
+		}else{
+			Attribute a=AttributeConnections.get(cloned);
+			if(a.isProtected()) container.addProtectedAttribute(a);
+			else container.addAccessedAttribute(a);
+		}
 	}
 
 	private void setLocalParametrized(){
@@ -502,13 +548,13 @@ class Interpreter {
 			if(a.isLocalVariable()){
 				FamixClass type=a.getType();
 				Method m=getMethodByID(a.getContainerID());
-				FamixClass container;
-				if(m!=null){
-					if(type==null) return;
-					addAttribute(type.getExtender(),a,m);
-				}else{
-					container=getClassByID(a.getContainerID());
-					addAttribute(type.getExtender(),a,container);
+				if(m==null) continue;
+				FamixClass container=m.getParent();
+				if(container==null) continue;
+				if(container.getContainer()){
+					if(container.getContainedTypes().contains(type)){
+						addAttribute(type.getExtender(),a,m);
+					}
 				}
 			}
 		}
@@ -556,11 +602,20 @@ class Interpreter {
 				Method m=getMethodByID(a.getContainerID());
 				FamixClass container;
 				if(m!=null) {
-					addAttribute(getClassByID(p.parameterizableClassID), a, m);
+					a.setClass(getClassByID(p.parameterizableClassID));
+					a.setType(p.parameterizableClassID);
+					a.setContainerMethod(m);
+					if(a.isProtected()) m.addProtectedAttribute(a);
+					else m.addAccessedAttribute(a);
 				}
 				else {
 					container = getClassByID(a.getContainerID());
-					addAttribute(getClassByID(p.parameterizableClassID), a, container);
+					a.setType(p.parameterizableClassID);
+					a.setClass(getClassByID(p.parameterizableClassID));
+					if(container!=null) {
+						if (a.isProtected()) container.addProtectedAttribute(a);
+						else container.addAccessedAttribute(a);
+					}
 				}
 			}
 		}
@@ -592,12 +647,13 @@ class Interpreter {
 		setContainingFiles();
 		setClassesMethods();
 		setClassToAttribute();
+		setParameterizedAttributes();
 		setInheritanceRelations();
 		setInvocations();
 		setContainerToAttribute();
 		setAttributesToParametrizableClasses();
 		setLocalParametrized();
-		setParameterizedAttributes();
+		/*set parameterized attributes */
 		Iterator<FamixClass> it=Classes.iterator();
 		while(it.hasNext()) {
 			FamixClass c=it.next();
@@ -622,7 +678,7 @@ class Interpreter {
 	}
 
 	public String getClassMetrics(){
-        String st="file,class,AMW,WMC,NOM,NOPA,NOAV,NProtM\n";
+        String st="file,class,AMW,WMC,NOM,NOPA,NOAV,NProtM,ATFD,FDP,TCC\n";
         Iterator<FamixClass> it=Classes.iterator();
         while(it.hasNext()){
         	FamixClass c=it.next();
@@ -634,7 +690,11 @@ class Interpreter {
     }
 
     public void checkParameters(){
+		Iterator<Method> it=Methods.iterator();
+		while(it.hasNext()){
+			Method m=it.next();
 
+		}
 	}
 
 	public String toString() {

@@ -5,6 +5,7 @@ import java.util.Set;
 
 class Method {
 	private String kind;
+	private boolean constr=false;
 	private long parentType,ID;
 	private FamixClass ParentClass;
 	private String signature;
@@ -21,11 +22,15 @@ class Method {
 		this.parentType=parentType;
 		this.ID=ID;
 		this.signature=signature;
+		this.constr=kind.contains("constructor");
 		this.modifiers=modifiers;
 		this.cyclomaticComplexity=cyclomaticComplexity;
 	}
 	public void addLocalVariable(LocalVariable lv){
 	     localVariables.add(lv);
+    }
+    public boolean isConstr(){
+	    return constr;
     }
 	public void addParameter(Parameter p){
 	     parameters.add(p);
@@ -95,8 +100,42 @@ class Method {
 	public void addAccessedAttribute(Attribute a) {
 		AccessedAttributes.add(a);
 	}
+	public int howManyAttributesAccessesOutOfSet(Set<Attribute> attributes){
+	    Iterator<Attribute> it=attributes.iterator();
+	    int sum=0;
+	    while(it.hasNext()){
+            Attribute a=it.next();
+            if(AccessedAttributes.contains(a) && !a.isParamType()) {
+                sum++;
+            }
+            if(ProtectedAttributes.contains(a) && !a.isParamType()) sum++;
+        }
+	    return sum;
+    }
+
+	public boolean isUserDefined(){
+		if(ParentClass==null) return false;
+		return ParentClass.isUserDefined();
+	}
 	public boolean isAccessor(){
-		return true;
+		if((AccessedAttributes.size()+ProtectedAttributes.size())<=2 && cyclomaticComplexity==1){
+            if(CalledMethods.size()+ProtectedMethods.size()==0){
+                Attribute a;
+                if(AccessedAttributes.size()!=0) a=AccessedAttributes.stream()
+                                                    .findAny()
+                                                    .orElse(null);
+                else a=ProtectedAttributes.stream()
+                        .findAny()
+                        .orElse(null);
+                    String sign=signature.toLowerCase();
+                    char[] charArray=sign.toCharArray();
+                    if(charArray.length>=3) {
+                        if (charArray[0] == 'g' && charArray[1] == 'e' && charArray[2] == 't') return (AccessedAttributes.size()+ProtectedAttributes.size())<=1;
+                        if (charArray[0] == 's' && charArray[1] == 'e' && charArray[2] == 't') return (AccessedAttributes.size()+ProtectedAttributes.size())<=2;
+                    }
+            }
+        }
+		return false;
 	}
 	public String toString() {
 		String st="";
