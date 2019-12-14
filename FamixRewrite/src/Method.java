@@ -117,21 +117,89 @@ class Method {
 		if(ParentClass==null) return false;
 		return ParentClass.isUserDefined();
 	}
+	public Attribute getAccessorAttribute(){
+	    if(getAccessedAttributesSize()==1 && getProtectedAttributesSize()==1){
+            Iterator<Attribute> it=ProtectedAttributes.iterator();
+            while(it.hasNext()){
+                Attribute a=it.next();
+                if(a.isViable()) return a;
+            }
+        }else{
+	        if(getAccessedAttributesSize()==2){
+	            Iterator<Attribute> it=AccessedAttributes.iterator();
+	            while(it.hasNext()){
+	                Attribute a=it.next();
+	                if(!a.isParameter() && a.isViable()) return a;
+                }
+            }
+	        if(getAccessedAttributesSize()==1){
+	            Iterator<Attribute> it=AccessedAttributes.iterator();
+	            while(it.hasNext()){
+	                Attribute a=it.next();
+	                if(a.isViable()) return a;
+                }
+            }
+        }
+	    return null;
+    }
+    public boolean isPublic(){
+	    return modifiers.contains("public");
+    }
+
+    public boolean callsMethodFromParentOfType(FamixClass c){
+	    Iterator<Method> it=CalledMethods.iterator();
+	    while(it.hasNext()){
+	        Method m=it.next();
+	        if(c.equals(m.getParent())) return true;
+        }
+	    it=ProtectedMethods.iterator();
+	    while(it.hasNext()){
+	        Method m=it.next();
+	        if(c.equals(m.getParent())) return true;
+        }
+	    return false;
+    }
+
+    public boolean accessesAttributeOfType(FamixClass c){
+	    Iterator<Attribute> it=AccessedAttributes.iterator();
+	    while(it.hasNext()){
+	        Attribute a=it.next();
+	        if(c.equals(a.getType())) return true;
+        }
+	    it=ProtectedAttributes.iterator();
+	    while(it.hasNext()){
+	        Attribute a=it.next();
+	        if(c.equals(a.getType())) return true;
+        }
+	    return false;
+    }
+
+    public int getAccessedAttributesSize(){
+	    return (int)AccessedAttributes.stream()
+                .filter(Attribute::isViable)
+                .count();
+    }
+    public int getProtectedAttributesSize(){
+	    return (int)ProtectedAttributes.stream()
+                .filter(Attribute::isViable)
+                .count();
+    }
 	public boolean isAccessor(){
-		if((AccessedAttributes.size()+ProtectedAttributes.size())<=2 && cyclomaticComplexity==1){
+		if((getAccessedAttributesSize()+getProtectedAttributesSize())<=2 && cyclomaticComplexity==1){
             if(CalledMethods.size()+ProtectedMethods.size()==0){
                 Attribute a;
-                if(AccessedAttributes.size()!=0) a=AccessedAttributes.stream()
+                if(getAccessedAttributesSize()!=0) a=AccessedAttributes.stream()
                                                     .findAny()
                                                     .orElse(null);
                 else a=ProtectedAttributes.stream()
+                        .filter(Attribute::isViable)
                         .findAny()
                         .orElse(null);
                     String sign=signature.toLowerCase();
                     char[] charArray=sign.toCharArray();
                     if(charArray.length>=3) {
-                        if (charArray[0] == 'g' && charArray[1] == 'e' && charArray[2] == 't') return (AccessedAttributes.size()+ProtectedAttributes.size())<=1;
-                        if (charArray[0] == 's' && charArray[1] == 'e' && charArray[2] == 't') return (AccessedAttributes.size()+ProtectedAttributes.size())<=2;
+                        if (charArray[0] == 'g' && charArray[1] == 'e' && charArray[2] == 't') return (getAccessedAttributesSize()+getProtectedAttributesSize())<=1;
+                        if (charArray[0] == 's' && charArray[1] == 'e' && charArray[2] == 't') return (getAccessedAttributesSize()+getProtectedAttributesSize())<=2;
                     }
             }
         }

@@ -8,12 +8,19 @@ class Attribute {
 	private long containerID;
 	private boolean localVariable=false;
 	private boolean parameter=false;
+	private FamixClass containerClass;
 	public Attribute(long ID,boolean localVariable,boolean parameter) {
 		this.ID=ID;
 		this.localVariable=localVariable;
 		this.parameter=parameter;
 	}
-	public boolean isParameter(){
+    public void setContainerClass(FamixClass containerClass) {
+        this.containerClass = containerClass;
+    }
+    public FamixClass getContainerClass(){
+	    return containerClass;
+    }
+    public boolean isParameter(){
 	    return parameter;
     }
     public boolean isViable(){
@@ -83,6 +90,9 @@ class Attribute {
 		}
 		return false;
 	}
+	public boolean isPrivate(){
+	    return modifiers.contains("private");
+    }
 	public String getModifiers(){
 		return modifiers;
 	}

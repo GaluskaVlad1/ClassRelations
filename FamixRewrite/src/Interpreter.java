@@ -25,7 +25,7 @@ class Interpreter {
 			return;
 		}
 		if(st.contains("(FAMIX.IndexedFileAnchor")) {
-			interpretFile();
+			interpretFile(st);
 			return;
 		}
 		if(st.contains("(FAMIX.Method")) {
@@ -33,11 +33,11 @@ class Interpreter {
 			return;
 		}
 		if(st.contains("(FAMIX.Invocation")) {
-			interpretInvocation();
+			interpretInvocation(st);
 			return;
 		}
 		if(st.contains("(FAMIX.Inheritance")) {
-			interpretInheritance();
+			interpretInheritance(st);
 			return;
 		}
 		if(st.contains("(FAMIX.Attribute")||st.contains("(FAMIX.LocalVariable ") || st.contains("FAMIX.Parameter ")) {
@@ -45,7 +45,7 @@ class Interpreter {
 			return;
 		}
 		if(st.contains("(FAMIX.Access ")){
-			interpretAccess();
+			interpretAccess(st);
 			return;
 		}
 		if(st.contains("(FAMIX.ParameterizedType ")){
@@ -54,8 +54,8 @@ class Interpreter {
 		}
 	}
 
-	private void interpretAccess() throws Exception{
-		maxID++;
+	private void interpretAccess(String st1) throws Exception{
+		maxID=getID(st1.toCharArray());
 		String st=r.getNextLine();
 		long variableID=0;
 		long accessorID=0;
@@ -169,9 +169,13 @@ class Interpreter {
 		}
 		return st;
 	}
-	
-	private void interpretInvocation() throws Exception{
-		maxID++;
+
+	public ArrayList<FamixClass> getClasses(){
+	    return Classes;
+    }
+
+	private void interpretInvocation(String st1) throws Exception{
+		maxID=getID(st1.toCharArray());
 		String st=r.getNextLine();
 		long candidateID=0;
 		long receiverID=0;
@@ -189,8 +193,8 @@ class Interpreter {
 		checkForType(st);
 	}
 	
-	private void interpretInheritance() throws Exception{
-		maxID++;
+	private void interpretInheritance(String st1) throws Exception{
+		maxID=getID(st1.toCharArray());
 		String st=r.getNextLine();
 		while(!st.contains("subclass")) {
 			st=r.getNextLine();
@@ -225,10 +229,10 @@ class Interpreter {
 		checkForType(st);
 	}
 	
-	private void interpretFile() throws Exception{
+	private void interpretFile(String st1) throws Exception{
+	    maxID=getID(st1.toCharArray());
 		String st=r.getNextLine();
 		long ID=getID(st.toCharArray());
-		maxID=ID;
 		while(!st.contains("fileName")) {
 			st=r.getNextLine();
 		}
@@ -402,7 +406,19 @@ class Interpreter {
 			FamixClass c=getClassByID(ID);
 			a.setClass(c);
 			Method m=getMethodByID(a.getContainerID());
-			a.setContainerMethod(m);
+			if(m!=null) {
+                a.setContainerMethod(m);
+                a.setContainerClass(m.getParent());
+            }else{
+			    FamixClass containerClass=getClassByID(a.getContainerID());
+			    if(containerClass==null){
+			        ParametrizedType pt=getParametrizedTypeByID(a.getContainerID());
+			        if(pt==null) continue;
+			        containerClass=getClassByID(pt.parameterizableClassID);
+			        if(containerClass==null) continue;
+                }
+			    a.setContainerClass(containerClass);
+            }
 		}
 	}
 
@@ -510,6 +526,7 @@ class Interpreter {
 			a.setModifiers(cloned.getModifiers());
 			if (a.isProtected()) container.addProtectedAttribute(a);
 			else container.addAccessedAttribute(a);
+			setContainer(a);
 			Attributes.add(a);
 			AttributeConnections.put(cloned,a);
 		}else{
@@ -533,6 +550,7 @@ class Interpreter {
 			a.setModifiers(cloned.getModifiers());
 			if (a.isProtected()) container.addProtectedAttribute(a);
 			else container.addAccessedAttribute(a);
+			setContainer(a);
 			Attributes.add(a);
 			AttributeConnections.put(cloned,a);
 		}else{
@@ -542,6 +560,9 @@ class Interpreter {
 		}
 	}
 
+	public ArrayList<Method> getMethods(){
+	    return Methods;
+    }
 	private void setLocalParametrized(){
 		for(int i=0;i<Attributes.size();i++){
 			Attribute a=Attributes.get(i);
@@ -642,6 +663,25 @@ class Interpreter {
         }
     }
 
+    private void setContainer(Attribute a){
+        long ID=a.getTypeID();
+        FamixClass c=getClassByID(ID);
+        a.setClass(c);
+        Method m=getMethodByID(a.getContainerID());
+        if(m!=null) {
+            a.setContainerMethod(m);
+            a.setContainerClass(m.getParent());
+        }else{
+            FamixClass containerClass=getClassByID(a.getContainerID());
+            if(containerClass==null){
+                ParametrizedType pt=getParametrizedTypeByID(a.getContainerID());
+                if(pt==null) return;
+                containerClass=getClassByID(pt.parameterizableClassID);
+                if(containerClass==null) return;
+            }
+            a.setContainerClass(containerClass);
+        }
+    }
 	public void initialize() {
 		setContainerToClass();
 		setContainingFiles();
@@ -678,23 +718,19 @@ class Interpreter {
 	}
 
 	public String getClassMetrics(){
-        String st="file,class,AMW,WMC,NOM,NOPA,NOAV,NProtM,ATFD,FDP,TCC\n";
+        String st="file,class,AMW,WMC,NOM,NOPA,NOAV,NProtM,ATFD,ATFD2,FDP,TCC,LAA,WOC,BOvR,CC,CM,CINT,CDISP\n";
         Iterator<FamixClass> it=Classes.iterator();
         while(it.hasNext()){
         	FamixClass c=it.next();
         	if(c.getContainingFile()!=null){
-        		st=st+c.getContainingFile().getFileName()+","+c.getClassName()+","+c.getMetrics()+"\n";
+        		st=st+c.getContainingFile().getFileName()+","+c.getClassName()+","+c.getMetrics(this)+"\n";
 			}
 		}
         return st;
     }
 
     public void checkParameters(){
-		Iterator<Method> it=Methods.iterator();
-		while(it.hasNext()){
-			Method m=it.next();
 
-		}
 	}
 
 	public String toString() {

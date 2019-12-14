@@ -1,4 +1,7 @@
+import jdk.nashorn.internal.codegen.CompilerConstants;
+
 import java.util.*;
+import java.util.stream.Collectors;
 
 class FamixClass {
 	private long ID;
@@ -46,13 +49,29 @@ class FamixClass {
     public boolean isViable(){
 	    return viable;
     }
+    public Set<Attribute> getForeignAccesses(){
+        Set<Attribute> aa=new HashSet<Attribute>();
+        Iterator<Attribute> it=AccessedAttributes.iterator();
+        while(it.hasNext()){
+            Attribute a=it.next();
+            if(a.getType()==null) continue;
+            if(!isRelated(a.getType()) && !ContainedAttributes.contains(a) && a.isPublic() && a.isViable()){
+                aa.add(a);
+            }
+        }
+        Iterator<Method> itm=CalledMethods.iterator();
+        while(itm.hasNext()){
+            Method m=itm.next();
+            if(!m.isConstr() && m.isAccessor()){
+                aa.add(m.getAccessorAttribute());
+            }
+        }
+        return aa;
+    }
     public int getATFD(){
-        return  (int)AccessedAttributes.stream()
-                .filter(attribute -> attribute.getContainerMethod()!=null)
-                .filter(Attribute::isUserDefined)
-                .filter(attribute -> !isRelated(attribute.getType()))
-                .filter(attribute->attribute.getType().isViable())
-                .count();
+        return (int)getForeignAccesses().stream()
+                        .filter(attribute -> attribute!=null)
+                        .count();
     }
 
     public boolean isRelated(FamixClass c){
@@ -188,6 +207,15 @@ class FamixClass {
 		return null;
 	}
 
+	public Method getMethod(String signature){
+	    Iterator<Method> it=ContainedMethods.iterator();
+	    while(it.hasNext()){
+	        Method m=it.next();
+	        if(m.getSignature().equals(signature)) return m;
+        }
+	    return null;
+    }
+
 	public long getID() {
 		return ID;
 	}
@@ -271,12 +299,139 @@ class FamixClass {
     public int getNProtM(){
 	    return getNProtMA()+getNProtMM();
     }
-	public String getMetrics(){
+	public String getMetrics(Interpreter i){
 		String st="";
-		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA()+","+getNOAV()+","+getNProtM()+","+getATFD()+","+getFDP()+","+round(getTCC());
+		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA()+","+getNOAV()+","+getNProtM()+","+getATFD()+","+getATFD2()+","+getFDP()+","+round(getTCC())+","+
+                round(getLAA())+","+round(getWOC())+","+round(getBOvR())+","+getCC(i)+","+getCM(i)+","+getCINT()+","+round(getCDISP());
 		return st;
 	}
 
+	public double getCDISP(){
+        Set<FamixClass> s=new HashSet<FamixClass>();
+        Iterator<Method> it=CalledMethods.iterator();
+        while(it.hasNext()){
+            Method m=it.next();
+            if(m.isUserDefined() && m.getParent()!=null) s.add(m.getParent());
+        }
+        it=ProtectedCalledMethods.iterator();
+        while(it.hasNext()){
+            Method m=it.next();
+            if(m.isUserDefined() && m.getParent()!=null) s.add(m.getParent());
+        }
+        int CINT=getCINT();
+        if(CINT==0) return 0;
+        return ((double)s.size())/((double)CINT);
+    }
+
+	public int getCINT(){
+        return (int)CalledMethods.stream()
+                        .filter(Method::isUserDefined).count()+
+                (int)ProtectedCalledMethods.stream()
+                        .filter(Method::isUserDefined).count();
+    }
+
+	public int getCM(Interpreter i){
+	    Iterator<Method> it=i.getMethods().iterator();
+	    Set<Method> s=new HashSet<Method>();
+	    while(it.hasNext()){
+	        Method m=it.next();
+	        if(!this.equals(m.getParent()) && (m.accessesAttributeOfType(this) || m.callsMethodFromParentOfType(this))) s.add(m);
+        }
+	    return s.size();
+    }
+
+	public double getBOvR(){
+	    double nrOfOvMethods=ContainedMethods.stream()
+                .filter(method -> !method.getSignature().contains("<init>"))
+                .filter(method -> this.isOverrideOrSpecialize(method)!=null)
+                .filter(method -> !method.isConstr())
+                .count();
+	    double nrOfMethods=ContainedMethods.stream()
+                .filter(method->!method.getSignature().contains("<init>"))
+                .filter(method -> !method.isConstr())
+                .count();
+	    if(nrOfMethods==0) return 0;
+	    return nrOfOvMethods/nrOfMethods;
+    }
+
+    public int getCC(Interpreter i){
+        ArrayList<FamixClass> Classes=i.getClasses();
+        Set<FamixClass> s=new HashSet<FamixClass>();
+        Iterator<FamixClass> it=Classes.iterator();
+        while(it.hasNext()){
+            FamixClass c=it.next();
+            if(!this.equals(c) && (c.callsMethodsFromType(this) || c.containsAccessedAttributeOfType(this))) s.add(c);
+        }
+        return s.size();
+    }
+
+    public boolean callsMethodsFromType(FamixClass c){
+        Iterator<Method> it=CalledMethods.iterator();
+        while(it.hasNext()){
+            Method m=it.next();
+            if(c.equals(m.getParent())) return true;
+        }
+        it=ProtectedCalledMethods.iterator();
+        while(it.hasNext()){
+            Method m=it.next();
+            if(c.equals(m.getParent())) return true;
+        }
+        return false;
+    }
+
+    public boolean containsAccessedAttributeOfType(FamixClass c){
+	    Iterator<Attribute> it=AccessedAttributes.iterator();
+	    while(it.hasNext()){
+	        Attribute a=it.next();
+	        if(c.equals(a.getType())) return true;
+        }
+	    it=ProtectedAccessedAttributes.iterator();
+	    while(it.hasNext()){
+	        Attribute a=it.next();
+	        if(c.equals(a.getType())) return true;
+        }
+	    return false;
+    }
+
+	public double getLAA(){
+        double nrOfContained=ContainedAttributes.stream()
+                                .filter(Attribute::isViable)
+                                .count();
+        Set<Attribute> foreignAccesses=getForeignAccesses();
+        foreignAccesses.addAll(AccessedAttributes);
+        foreignAccesses.addAll(ProtectedAccessedAttributes);
+        double nrOfAccesses=foreignAccesses.stream()
+                                .filter(Attribute::isViable)
+                                .filter(Attribute::isPrivate)
+                                .count();
+        if(nrOfAccesses==0) return nrOfContained;
+        return nrOfContained/nrOfAccesses;
+
+    }
+
+	public int getATFD2(){
+	    return (int)getForeignAccesses().stream()
+                .filter(attribute -> attribute!=null)
+                .filter(Attribute::isUserDefined)
+                .count();
+    }
+    public double getWOC(){
+        double functionalMethods=ContainedMethods.stream()
+                .filter(method -> !method.isAccessor())
+                .filter(Method::isPublic)
+                .filter(method -> !method.isConstr())
+                .count();
+        double allPublicMembers=ContainedMethods.stream()
+                .filter(Method::isPublic)
+                .filter(method -> !method.isAccessor())
+                .count()+
+                ContainedAttributes.stream()
+                .filter(Attribute::isPublic)
+                .filter(Attribute::isViable)
+                .count();
+        if(allPublicMembers==0) return 0;
+        return functionalMethods/allPublicMembers;
+    }
 	public double getTCC(){
         int NP=(int)ContainedMethods.stream()
                 .filter(method -> !method.isConstr())
@@ -302,17 +457,13 @@ class FamixClass {
     }
 
 	public int getFDP(){
-	    return getFDPFromSetAttributes(AccessedAttributes)+getFDPFromSetAttributes(ProtectedAccessedAttributes);
-    }
-
-    public int getFDPFromSetAttributes(Collection<Attribute> a){
-	    return (int)a.stream()
-                .filter(Attribute::isUserDefined)
-                .map(Attribute::getType)
-                .filter(FamixClass::isViable)
+	    return (int)getForeignAccesses().stream()
+                .filter(attribute -> attribute!=null)
+                .map(Attribute::getContainerClass)
                 .distinct()
                 .count();
     }
+
 	public FamixClass getExtender(){
 	    if(InheritedClasses.size()>=1) return InheritedClasses.get(0);
 	    else return null;
