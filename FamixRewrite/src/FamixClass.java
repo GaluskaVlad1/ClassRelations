@@ -1,3 +1,4 @@
+import com.sun.org.apache.bcel.internal.generic.FADD;
 import jdk.nashorn.internal.codegen.CompilerConstants;
 
 import java.util.*;
@@ -118,6 +119,18 @@ class FamixClass {
 	public void addAttribute(Attribute a) {
 		ContainedAttributes.add(a);
 	}
+
+	public boolean isBOVRProper(Method m){
+	    if(ContainedMethods.contains(m)) {
+            Iterator<FamixClass> it=InheritedClasses.iterator();
+            while(it.hasNext()){
+                FamixClass c=it.next();
+                if(c.hasMethod(m.getSignature())) return true;
+            }
+            return false;
+        }
+	    return false;
+    }
 
 	public void setOverrideOrSpecialize() {
 		Iterator<Method> it=ContainedMethods.iterator();
@@ -302,9 +315,86 @@ class FamixClass {
 	public String getMetrics(Interpreter i){
 		String st="";
 		st=st+round(getAMW())+","+getWMC()+","+getNOM()+","+getNOPA()+","+getNOAV()+","+getNProtM()+","+getATFD()+","+getATFD2()+","+getFDP()+","+round(getTCC())+","+
-                round(getLAA())+","+round(getWOC())+","+round(getBOvR())+","+getCC(i)+","+getCM(i)+","+getCINT()+","+round(getCDISP());
+                round(getLAA())+","+round(getWOC())+","+round(getBOvR())+","+getCC(i)+","+getCM(i)+","+getCINT()+","+round(getCDISP())+","+
+                round(getBUR())+","+getHIT(i)+","+getDIT(this,0);
 		return st;
 	}
+
+	public int getDIT(FamixClass c,int height){
+        Iterator<FamixClass> it=InheritedClasses.iterator();
+        int maxHeight=height;
+        while(it.hasNext()){
+            FamixClass c1=it.next();
+            if(!c1.isFromJava) {
+                int newHeight = c1.getDIT(c, height + 1);
+                if (newHeight > maxHeight) maxHeight = newHeight;
+            }
+        }
+        return maxHeight;
+    }
+
+	public int getHIT(Interpreter i){
+        ArrayList<FamixClass> classes=i.getClasses();
+        Iterator<FamixClass> it=classes.iterator();
+        int maxHeight=0;
+        while(it.hasNext()){
+            FamixClass c=it.next();
+            if(!c.isViable()) continue;
+            int height=c.getInheritHeight(this,1);
+            if(height>maxHeight) maxHeight=height;
+        }
+        return maxHeight;
+    }
+
+    public int getInheritHeight(FamixClass c,int height){
+	    if(InheritedClasses.contains(c)) {
+	    	return height;
+		}
+	    Iterator<FamixClass> it=InheritedClasses.iterator();
+	    int maxHeight=0;
+	    while(it.hasNext()){
+	        FamixClass c1=it.next();
+	        if(!c1.isViable()) continue;
+            int newHeight=c1.getInheritHeight(c,height+1);
+            if(newHeight>maxHeight) maxHeight=newHeight;
+        }
+	    return maxHeight;
+    }
+
+	public double getBUR(){
+	    Iterator<Attribute> ita=ProtectedAccessedAttributes.iterator();
+	    int protectedAccesses=0;
+	    int totalProtectedAttributes=0;
+	    while(ita.hasNext()){
+	        Attribute a=ita.next();
+	        if(!a.isViable()) continue;
+	        FamixClass type=a.getType();
+	        if(InheritedClasses.contains(type)) protectedAccesses++;
+        }
+	    Iterator<Method> itm=ProtectedCalledMethods.iterator();
+	    while(itm.hasNext()){
+	        Method m=itm.next();
+	        FamixClass type=m.getParent();
+	        if(InheritedClasses.contains(type)) protectedAccesses++;
+        }
+	    Iterator<FamixClass> itc=InheritedClasses.iterator();
+	    while(itc.hasNext()){
+	        FamixClass c=itc.next();
+            totalProtectedAttributes=c.getNoProtectedAccesses()+totalProtectedAttributes;
+        }
+	    if(totalProtectedAttributes==0) return 0;
+	    return ((double)protectedAccesses)/((double)totalProtectedAttributes);
+    }
+
+    public int getNoProtectedAccesses(){
+	    return (int)ContainedAttributes.stream()
+                .filter(Attribute::isViable)
+				.filter(Attribute::isProtected)
+                .count()+(int)ContainedMethods.stream()
+									.filter(Method::isProtected)
+									.count();
+    }
+
 
 	public double getCDISP(){
         Set<FamixClass> s=new HashSet<FamixClass>();
@@ -343,7 +433,7 @@ class FamixClass {
 	public double getBOvR(){
 	    double nrOfOvMethods=ContainedMethods.stream()
                 .filter(method -> !method.getSignature().contains("<init>"))
-                .filter(method -> this.isOverrideOrSpecialize(method)!=null)
+                .filter(method -> isBOVRProper(method))
                 .filter(method -> !method.isConstr())
                 .count();
 	    double nrOfMethods=ContainedMethods.stream()
@@ -401,6 +491,7 @@ class FamixClass {
         foreignAccesses.addAll(AccessedAttributes);
         foreignAccesses.addAll(ProtectedAccessedAttributes);
         double nrOfAccesses=foreignAccesses.stream()
+								.filter(attribute -> attribute!=null)
                                 .filter(Attribute::isViable)
                                 .filter(Attribute::isPrivate)
                                 .count();
