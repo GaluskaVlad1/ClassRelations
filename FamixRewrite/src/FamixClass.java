@@ -537,8 +537,16 @@ class FamixClass {
                 for (int j = i + 1; j < ContainedMethods.size(); j++) {
                     Method next = ContainedMethods.get(j);
                     if (!next.getSignature().contains("<init>") && !next.isConstr()) {
-                        NDC = NDC + next.howManyAttributesAccessesOutOfSet(current.getAccessedAttributes());
-                        NDC = NDC + next.howManyAttributesAccessesOutOfSet(current.getProtectedAttributesAccessed());
+                        int a1=next.howManyAttributesAccessesOutOfSet(current.getAccessedAttributes());
+                        if(a1==1) {
+                        	NDC++;
+						}
+                        else {
+							int a2 = next.howManyAttributesAccessesOutOfSet(current.getProtectedAttributesAccessed());
+							if(a2==1) {
+								NDC++;
+							}
+						}
                     }
                 }
             }
@@ -555,6 +563,9 @@ class FamixClass {
                 .count();
     }
 
+    public boolean containsAttribute(Attribute a){
+		return ContainedAttributes.contains(a);
+	}
 	public FamixClass getExtender(){
 	    if(InheritedClasses.size()>=1) return InheritedClasses.get(0);
 	    else return null;

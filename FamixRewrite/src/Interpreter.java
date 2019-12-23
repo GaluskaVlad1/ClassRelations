@@ -730,7 +730,18 @@ class Interpreter {
     }
 
     public void checkParameters(){
-
+		Iterator<Method> it=Methods.iterator();
+		while(it.hasNext()){
+			 Method m=it.next();
+			 Iterator<Attribute> ita=m.getAccessedAttributes().iterator();
+			 while(ita.hasNext()){
+			 	Attribute a=ita.next();
+			 }
+			 ita=m.getProtectedAttributesAccessed().iterator();
+			while(ita.hasNext()){
+				Attribute a=ita.next();
+			}
+		}
 	}
 
 	public String toString() {

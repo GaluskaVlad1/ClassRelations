@@ -105,12 +105,15 @@ class Method {
 	    int sum=0;
 	    while(it.hasNext()){
             Attribute a=it.next();
-            if(AccessedAttributes.contains(a) && !a.isParamType()) {
+            if(AccessedAttributes.contains(a) && ParentClass.containsAttribute(a)) {
                 sum++;
             }
-            if(ProtectedAttributes.contains(a) && !a.isParamType()) sum++;
+            if(ProtectedAttributes.contains(a) && ParentClass.containsAttribute(a)) {
+            	sum++;
+			}
         }
-	    return sum;
+	    if(sum==0) return 0;
+	    return 1;
     }
 
 	public boolean isUserDefined(){

@@ -34,6 +34,21 @@ public class Main{
 		return common;
 	}
 
+	public static String getCommonBasedOnFileSeparators(String common){
+		String newCommon="";
+		String separator="";
+		int size=common.length();
+		for(int i=0;i<size;i++){
+			char c=common.charAt(i);
+			if(c=='/'){
+				newCommon=newCommon+separator;
+				separator="";
+			}
+			else separator=separator+c;
+		}
+		return newCommon;
+	}
+
 	static String getCommonFromTwoStrings(String a,String b){
 		String st="";
 		for(int i=0;i<a.length();i++){
@@ -45,7 +60,7 @@ public class Main{
 	}
 
 	static void replaceSame(ArrayList<ContainingFile> files){
-		String st=getCommonFromAll(files);
+		String st=getCommonBasedOnFileSeparators(getCommonFromAll(files));
 		Iterator<ContainingFile> it=files.iterator();
 		while(it.hasNext()){
 			ContainingFile f=it.next();
