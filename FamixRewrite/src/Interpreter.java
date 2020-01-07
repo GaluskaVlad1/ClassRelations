@@ -140,6 +140,8 @@ class Interpreter {
 		String signature="";
 		String modifiers="";
 		String kind="";
+		Long declaredType=0L;
+		boolean isStub=false;
 		int cyclomaticComplexity=1;
 		while(st!=null && !st.contains("FAMIX.")) {
 			if(st.contains("kind")) kind=getName(st.toCharArray());
@@ -147,9 +149,11 @@ class Interpreter {
 			if(st.contains("parentType")) parentType=getID(st.toCharArray());
 			if(st.contains("signature"))signature=getName(st.toCharArray());
 			if(st.contains("cyclomaticComplexity"))cyclomaticComplexity=(int)getID(st.toCharArray());
+			if(st.contains("isStub")) isStub=true;
+			if(st.contains("declaredType")) declaredType=getID(st.toCharArray());
 			st=r.getNextLine();
 		}
-		Method m=new Method(MethodID,parentType,signature,modifiers,kind,cyclomaticComplexity);
+		Method m=new Method(MethodID,parentType,signature,modifiers,kind,cyclomaticComplexity,isStub,declaredType);
 		Methods.add(m);
 		checkForType(st);
 	}
@@ -459,6 +463,17 @@ class Interpreter {
         }
 	}
 
+	private void setReturnToMethods(){
+		Iterator<Method> it=Methods.iterator();
+		while(it.hasNext()){
+			Method m=it.next();
+			FamixClass c=getClassByID(m.getDeclaredTypeID());
+			if(c!=null) {
+				m.setDeclaredType(c);
+			}
+		}
+	}
+
 	private void setAttributesToParametrizableClasses(){
 		Iterator<Access> it=Accesses.iterator();
 		while(it.hasNext()){
@@ -690,6 +705,7 @@ class Interpreter {
 		setParameterizedAttributes();
 		setInheritanceRelations();
 		setInvocations();
+		setReturnToMethods();
 		setContainerToAttribute();
 		setAttributesToParametrizableClasses();
 		setLocalParametrized();
@@ -730,22 +746,11 @@ class Interpreter {
     }
 
     public void checkParameters(){
-		Iterator<Method> it=Methods.iterator();
-		while(it.hasNext()){
-			 Method m=it.next();
-			 Iterator<Attribute> ita=m.getAccessedAttributes().iterator();
-			 while(ita.hasNext()){
-			 	Attribute a=ita.next();
-			 }
-			 ita=m.getProtectedAttributesAccessed().iterator();
-			while(ita.hasNext()){
-				Attribute a=ita.next();
-			}
-		}
+
 	}
 
 	public String toString() {
-		String st="source,target,extCalls,extData,hierarchy\n";
+		String st="source,target,extCalls,extData,hierarchy,returns\n";
 		Iterator<ContainingFile> it=Files.iterator();
 		while(it.hasNext()) {
 			ContainingFile f=it.next();

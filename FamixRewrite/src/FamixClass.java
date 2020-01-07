@@ -1,9 +1,4 @@
-import com.sun.org.apache.bcel.internal.generic.FADD;
-import jdk.nashorn.internal.codegen.CompilerConstants;
-
 import java.util.*;
-import java.util.stream.Collectors;
-
 class FamixClass {
 	private long ID;
 	private boolean viable=true;
@@ -50,6 +45,7 @@ class FamixClass {
     public boolean isViable(){
 	    return viable;
     }
+
     public Set<Attribute> getForeignAccesses(){
         Set<Attribute> aa=new HashSet<Attribute>();
         Iterator<Attribute> it=AccessedAttributes.iterator();
@@ -104,8 +100,19 @@ class FamixClass {
 		return ProtectedAccessedAttributes;
 	}
 
+	public Set<Method> removeAccessors(Set<Method> methods){
+		Set<Method> m=new HashSet<Method>();
+		Iterator<Method> it=methods.iterator();
+		while(it.hasNext()){
+			Method single=it.next();
+			if(!single.isAccessor()) m.add(single);
+		}
+		return m;
+	}
+
 	public Set<Method> getCalledProtectedMethods(){
-		return ProtectedCalledMethods;
+		Set<Method> pcm=ProtectedCalledMethods;
+		return pcm;
 	}
 
 	public Set<Attribute> getAccessedAttributes(){
@@ -265,6 +272,7 @@ class FamixClass {
 	public double getAMW(){
 	    return ContainedMethods.stream()
 				.filter(method-> !method.getSignature().contains("<init>"))
+				.filter(Method::isNotDefaultConstructor)
                 .mapToInt(Method::getCyclomaticComplexity)
                 .average()
                 .orElse(0);
@@ -282,6 +290,7 @@ class FamixClass {
     public int getWMC(){
 		return ContainedMethods.stream()
 				.filter(method -> !method.getSignature().contains("<init>"))
+				.filter(Method::isNotDefaultConstructor)
 				.mapToInt(Method::getCyclomaticComplexity)
 				.sum();
 	}
@@ -289,6 +298,7 @@ class FamixClass {
 	public int getNOM(){
 		return (int) ContainedMethods.stream()
 				.filter(method -> !method.getSignature().contains("<init>"))
+				.filter(Method::isNotDefaultConstructor)
 				.count();
 	}
 
@@ -321,11 +331,12 @@ class FamixClass {
 	}
 
 	public int getDIT(FamixClass c,int height){
+		if(isInterface()) return 0;
         Iterator<FamixClass> it=InheritedClasses.iterator();
         int maxHeight=height;
         while(it.hasNext()){
             FamixClass c1=it.next();
-            if(!c1.isFromJava) {
+            if(!c1.isFromJava && !c1.isInterface()) {
                 int newHeight = c1.getDIT(c, height + 1);
                 if (newHeight > maxHeight) maxHeight = newHeight;
             }
@@ -334,12 +345,13 @@ class FamixClass {
     }
 
 	public int getHIT(Interpreter i){
+		if(isInterface()) return 0;
         ArrayList<FamixClass> classes=i.getClasses();
         Iterator<FamixClass> it=classes.iterator();
         int maxHeight=0;
         while(it.hasNext()){
             FamixClass c=it.next();
-            if(!c.isViable()) continue;
+            if(!c.isViable() || c.isInterface()) continue;
             int height=c.getInheritHeight(this,1);
             if(height>maxHeight) maxHeight=height;
         }

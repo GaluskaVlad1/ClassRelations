@@ -17,7 +17,10 @@ class Method {
 	private Set<Attribute> AccessedAttributes=new HashSet<Attribute> ();
 	private Set<Method> ProtectedMethods=new HashSet<Method> ();
 	private Set<Attribute> ProtectedAttributes=new HashSet<Attribute> ();
-	public Method(long ID,long parentType,String signature,String modifiers,String kind,int cyclomaticComplexity) {
+	private boolean isStub=false;
+	private long declaredTypeID;
+	private FamixClass declaredType;
+	public Method(long ID,long parentType,String signature,String modifiers,String kind,int cyclomaticComplexity,boolean isStub,long declaredType) {
 		this.kind=kind;
 		this.parentType=parentType;
 		this.ID=ID;
@@ -25,6 +28,8 @@ class Method {
 		this.constr=kind.contains("constructor");
 		this.modifiers=modifiers;
 		this.cyclomaticComplexity=cyclomaticComplexity;
+		this.isStub=isStub;
+		this.declaredTypeID=declaredType;
 	}
 	public void addLocalVariable(LocalVariable lv){
 	     localVariables.add(lv);
@@ -80,6 +85,9 @@ class Method {
 	public int hashCode() {
 		return (int) (ID ^ (ID >>>32));
 	}
+	public boolean isNotDefaultConstructor(){
+		return !(isStub && constr);
+	}
 	public boolean equals(Object o) {
 		if(o instanceof Method) {
 			Method m=(Method) o;
@@ -87,6 +95,15 @@ class Method {
 			return false;
 		}
 		return false;
+	}
+	public long getDeclaredTypeID(){
+		return declaredTypeID;
+	}
+	public FamixClass getDeclaredType(){
+		return declaredType;
+	}
+	public void setDeclaredType(FamixClass declaredType){
+		this.declaredType=declaredType;
 	}
 	public Set<Attribute> getAttributes(){
 		return AccessedAttributes;

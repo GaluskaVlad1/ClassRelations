@@ -124,9 +124,6 @@ public class Main{
 		beginMetricsComputation(i,args[0]);
 
 		i.checkParameters();
-		/*Add Parametrized Type but only for attributes ParametrizedType should be a class that you don't show
-		* Also care for the way file shows them and adds methods, maybe only leave the null check for the final one
-		* PARAMETRIZED TYPE HAS NO METHODS!*/
 	}
 
 }

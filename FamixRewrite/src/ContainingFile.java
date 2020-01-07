@@ -13,6 +13,7 @@ class ContainingFile {
 	private Map<ContainingFile,Integer> FileInheritanceRelations=new HashMap<ContainingFile,Integer>();
 	private Map<ContainingFile,Triplet> FileRelations=new HashMap<ContainingFile,Triplet>();
 	private Map<ContainingFile,Set<Method>>  FileOverrideRelations=new HashMap<ContainingFile,Set<Method>>();
+	private Map<ContainingFile,Integer> FileReturnRelations=new HashMap<ContainingFile,Integer>();
 	private void setAllSets(){
 		Iterator<FamixClass> it=ContainedClasses.iterator();
 		while(it.hasNext()){
@@ -23,6 +24,32 @@ class ContainingFile {
 			setAccessedProtectedAttributes(c);
 			setInheritanceRelations(c);
 			setOverrideRelations(c);
+		}
+	}
+
+	private void setReturnRelations(){
+		setReturnForMethods(CalledMethods);
+		setReturnForMethods(CalledProtectedMethods);
+	}
+
+	private void setReturnForMethods(Set<Method> s){
+		Iterator<Method> it=s.iterator();
+		while(it.hasNext()){
+			Method m=it.next();
+			FamixClass c=m.getDeclaredType();
+			if(c!=null){
+				if(!c.isViable()){
+					c=c.getExtender();
+				}
+				if(c==null) continue;
+				if(c.getContainingFile()!=null && c.getContainingFile()!=this) {
+					if (FileReturnRelations.containsKey(c.getContainingFile())) {
+						FileReturnRelations.put(c.getContainingFile(), FileReturnRelations.get(c.getContainingFile()) + 1);
+					} else {
+						FileReturnRelations.put(c.getContainingFile(), 1);
+					}
+				}
+			}
 		}
 	}
 
@@ -58,6 +85,7 @@ class ContainingFile {
 	public void setEverything(){
 		setAllSets();
 		setCallRelations();
+		setReturnRelations();
 		setAccessRelations();
 		setCalledProtectedMethodRelations();
 		setAccessedProtectedAttributeRelations();
@@ -95,11 +123,23 @@ class ContainingFile {
 				FileRelations.put(f,t);
 			}
 		}
+		for(Map.Entry<ContainingFile,Integer> entry:FileReturnRelations.entrySet()){
+			ContainingFile f= entry.getKey();
+			int value=entry.getValue();
+			if(FileRelations.containsKey(f)){
+				FileRelations.get(f).setNoReturns(value);
+			}else{
+				Triplet t=new Triplet();
+				t.setNoReturns(value);
+				FileRelations.put(f,t);
+			}
+		}
 	}
 	private void setCallRelations(){
 		Iterator<Method> it=CalledMethods.iterator();
 		while(it.hasNext()){
 			Method m=it.next();
+			if(m.isAccessor()) continue;
 			FamixClass c=m.getParent();
 			ContainingFile f=null;
 			if(c!=null) f=c.getContainingFile();
@@ -124,6 +164,7 @@ class ContainingFile {
 		Iterator<Method> it=CalledProtectedMethods.iterator();
 		while(it.hasNext()){
 			Method m=it.next();
+			if(m.isAccessor()) continue;
 			FamixClass c=m.getParent();
 			ContainingFile f=null;
 			if(c!=null) f=c.getContainingFile();
@@ -141,7 +182,7 @@ class ContainingFile {
 			Attribute a=it.next();
 			FamixClass c=a.getType();
 			ContainingFile f=null;
-			if(c!=null) c.getContainingFile();
+			if(c!=null) f=c.getContainingFile();
 			if(f!=null && f!=this) AddFileToMap(FileInheritanceRelations,f,1);
 		}
 	}
